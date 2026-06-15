@@ -148,6 +148,9 @@
       <!-- VIEW: PLANNER (10-minute grid & todo lists) -->
       <div class="stage-view" id="view-planner">
         <div class="stage-view-card glass-panel animate-scale-up">
+          <button class="stage-card-close-btn" title="Back to Home">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
           <div class="card-header">
             <h2>Study Planner</h2>
             <p class="subtitle">Organize tasks and view your daily study log</p>
@@ -192,6 +195,9 @@
       <!-- VIEW: INSIGHTS (Stats, weekly comparison & heatmaps) -->
       <div class="stage-view" id="view-insights">
         <div class="stage-view-card glass-panel animate-scale-up">
+          <button class="stage-card-close-btn" title="Back to Home">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
           <div class="card-header">
             <h2>Insights & Stats</h2>
             <p class="subtitle">Analyze your focus progression</p>
@@ -211,24 +217,32 @@
               <span class="kpi-title">Streak Counter</span>
               <span class="kpi-val" id="streak-count">0 Days</span>
             </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Total Breaks</span>
+              <span class="kpi-val" id="kpi-total-breaks">0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Total Rest Time</span>
+              <span class="kpi-val" id="kpi-total-rest">0h 0m</span>
+            </div>
           </div>
 
           <!-- Charts -->
           <div class="charts-grid">
             <div class="chart-card">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
-                <h3 id="chart-focus-title" style="margin: 0; font-size: 1.15rem;">Weekly Focus Hours</h3>
-                <div class="chart-filters" style="display: flex; gap: 0.4rem;">
-                  <button class="filter-btn active chart-toggle-btn" data-range="weekly">Week</button>
-                  <button class="filter-btn chart-toggle-btn" data-range="yearly">Year</button>
-                </div>
-              </div>
+              <h3 style="font-size: 1.15rem; margin-bottom: 1.25rem;">Weekly Focus Hours</h3>
               <div class="chart-container">
                 <canvas id="weeklyHoursChart"></canvas>
               </div>
             </div>
             <div class="chart-card">
-              <h3 id="chart-dist-title" style="font-size: 1.15rem; margin-bottom: 1.25rem;">Weekly Distribution</h3>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+                <h3 id="chart-dist-title" style="margin: 0; font-size: 1.15rem;">Weekly Distribution</h3>
+                <div class="chart-filters" style="display: flex; gap: 0.4rem;">
+                  <button class="filter-btn active dist-toggle-btn" data-range="weekly">Week</button>
+                  <button class="filter-btn dist-toggle-btn" data-range="yearly">Year</button>
+                </div>
+              </div>
               <div class="chart-container">
                 <canvas id="subjectDistributionChart"></canvas>
               </div>
@@ -237,7 +251,13 @@
 
           <!-- Heatmap -->
           <div class="heatmap-card">
-            <h3>Daily Focus Intensity (Last 30 Days)</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+              <h3 id="heatmap-title" style="margin: 0; font-size: 1.05rem;">Daily Focus Intensity (Last 30 Days)</h3>
+              <div class="heatmap-filters" style="display: flex; gap: 0.4rem;">
+                <button class="filter-btn active heatmap-toggle-btn" data-range="weekly">Week</button>
+                <button class="filter-btn heatmap-toggle-btn" data-range="yearly">Year</button>
+              </div>
+            </div>
             <div class="heatmap-container">
               <div class="heatmap-grid" id="heatmap-grid-blocks"></div>
               <div class="heatmap-legend">
@@ -257,6 +277,9 @@
       <!-- VIEW: SETTINGS (Profile, Themes, Wipe options) -->
       <div class="stage-view" id="view-settings">
         <div class="stage-view-card glass-panel animate-scale-up">
+          <button class="stage-card-close-btn" title="Back to Home">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
           <div class="card-header">
             <h2>Settings & Environment</h2>
             <p class="subtitle">Customize profile targets and aesthetics</p>
