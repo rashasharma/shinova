@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="indigo-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shinova - Ambient Study Space & Planner</title>
+  <meta name="description" content="A beautiful minimalist study space inspired by Flocus & Yeolpumta, featuring fluid aurora backgrounds, dynamic timers, checklist trackers, and full study statistics.">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Moving Aurora Backdrop -->
+  <div class="aurora-bg"></div>
+
+  <!-- Cozy Wallpaper Backdrop -->
+  <div class="wallpaper-bg" id="wallpaper-bg"></div>
+
+  <!-- Fullscreen App Wrapper -->
+  <div class="fullscreen-container">
+    
+    <!-- Top Bar: Logo & Quote -->
+    <header class="top-bar">
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zap logo-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>shinova</span>
+      </div>
+      <div class="quote-header" id="top-quote-text">"You can't pour from an empty cup"</div>
+    </header>
+
+    <!-- Center Stage: Dynamic View Changer -->
+    <main class="center-stage" id="center-stage">
+      
+      <!-- VIEW: HOME (Default ambient clock + subject picker) -->
+      <div class="stage-view active" id="view-home">
+        <div class="view-home-content animate-fade-in">
+          <div class="greeting-message">
+            The perfect day for focus, <span id="home-username">Shinova User</span>
+          </div>
+          <!-- Huge typography clock -->
+          <div class="large-clock" id="local-clock-display">00:00</div>
+          
+          <div class="today-focus-total">
+            You have focused for <span id="today-total-time-home">00:00:00</span> today
+          </div>
+
+          <div class="home-actions-wrapper" style="margin-top: 1.5rem; position: relative; z-index: 10;">
+            <button class="btn btn-secondary btn-sm" id="btn-open-wallpapers" style="display: inline-flex; align-items: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              <span>Change Background</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: FOCUS TIMER (Active session stopwatch/countdown) -->
+      <div class="stage-view" id="view-focus">
+        <div class="view-focus-content animate-fade-in">
+          <div class="focus-subject-badge-wrapper" style="position: relative; z-index: 100;">
+            <div class="focus-subject-badge" id="focus-subject-badge" style="cursor: pointer;" title="Switch Subject">
+              <span class="color-dot" id="focus-subject-dot"></span>
+              <span id="focus-subject-name">Study Session</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.7;"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <!-- Beautiful glassmorphic dropdown list -->
+            <div class="subject-dropdown glass-panel" id="subject-switch-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 220px; max-height: 280px; overflow-y: auto; z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 14px; padding: 0.5rem; text-align: left;">
+              <!-- Generated dynamically by JS -->
+            </div>
+          </div>
+          
+          <!-- Huge typography timer, clickable to pause/resume -->
+          <div class="large-clock clickable-timer" id="focus-clock-display" title="Click to Pause / Resume">
+            00:00:00
+          </div>
+          
+          <div class="focus-status-sub" id="focus-status-text">FOCUSING</div>
+          <div class="focus-tap-hint">Click numbers to pause</div>
+
+          <!-- Rest & exit controls inside overlay -->
+          <div class="focus-view-actions">
+            <button class="btn-control-pill" id="btn-focus-rest">
+              <span id="rest-icon-coffee">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>
+              </span>
+              <span id="rest-icon-study" class="hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              </span>
+              <span id="rest-btn-text">Rest</span>
+            </button>
+
+            <button class="btn-control-pill" id="btn-focus-mode-toggle">
+              <span id="focus-mode-icon-stopwatch">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hourglass"><path d="M5 2h14"/><path d="M5 22h14"/><path d="M19 2v4c0 1.38-1.13 2.5-2.5 2.5S14 7.12 14 5.75v-1.5"/><path d="M14 5.75c0 1.38-1.13 2.5-2.5 2.5S9 7.12 9 5.75v-1.5"/><path d="M9 5.75c0 1.38-1.13 2.5-2.5 2.5S4 7.12 4 5.75v-1.5"/><path d="M19 22v-4c0-1.38-1.13-2.5-2.5-2.5S14 16.88 14 18.25v1.5"/><path d="M14 18.25c0-1.38-1.13-2.5-2.5-2.5S9 16.88 9 18.25v1.5"/><path d="M9 18.25c0-1.38-1.13-2.5-2.5-2.5S4 16.88 4 18.25v1.5"/></svg>
+              </span>
+              <span id="focus-mode-icon-timer" class="hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timer"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="12" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
+              </span>
+              <span id="focus-mode-name">Stopwatch</span>
+            </button>
+
+            <button class="btn-control-pill primary" id="btn-exit-focus">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg>
+              <span>End Session</span>
+            </button>
+          </div>
+          
+          <div class="today-focus-total" style="margin-top: 1.5rem; font-size: 0.95rem;">
+            Session Today: <span id="focus-session-total-text">0h 0m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: PLANNER (10-minute grid & todo lists) -->
+      <div class="stage-view" id="view-planner">
+        <div class="stage-view-card glass-panel animate-scale-up">
+          <div class="card-header">
+            <h2>Study Planner</h2>
+            <p class="subtitle">Organize tasks and view your daily study log</p>
+          </div>
+
+          <!-- YPT 10-Minute Timeline Graph -->
+          <div class="timeline-container">
+            <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 10-Minute Study Timeline</h3>
+            <div class="timeline-scroll-container">
+              <div class="timeline-grid-wrapper">
+                <div class="timeline-hours-axis">
+                  <span>00:00</span><span>02:00</span><span>04:00</span><span>06:00</span><span>08:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span><span>20:00</span><span>22:00</span>
+                </div>
+                <div class="timeline-grid" id="timeline-blocks">
+                  <!-- Generated by JS -->
+                </div>
+              </div>
+            </div>
+            <div class="timeline-legend" id="timeline-legend-container"></div>
+          </div>
+
+          <!-- Todo panel inside card -->
+          <div class="todo-panel">
+            <div class="todo-header-row">
+              <h3>To-Do Checklist</h3>
+              <button class="btn btn-primary btn-sm" id="btn-add-todo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg> Add Task
+              </button>
+            </div>
+            <div class="todo-filters">
+              <button class="filter-btn active" data-filter="all">All</button>
+              <button class="filter-btn" data-filter="pending">Pending</button>
+              <button class="filter-btn" data-filter="completed">Completed</button>
+            </div>
+            <ul class="todo-list" id="todo-items-list">
+              <!-- Generated by JS -->
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: INSIGHTS (Stats, weekly comparison & heatmaps) -->
+      <div class="stage-view" id="view-insights">
+        <div class="stage-view-card glass-panel animate-scale-up">
+          <div class="card-header">
+            <h2>Insights & Stats</h2>
+            <p class="subtitle">Analyze your focus progression</p>
+          </div>
+
+          <!-- KPI row -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <span class="kpi-title">Daily Average</span>
+              <span class="kpi-val" id="kpi-avg-time">0h 0m</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Max Study Record</span>
+              <span class="kpi-val" id="kpi-max-time">0h 0m</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Streak Counter</span>
+              <span class="kpi-val" id="streak-count">0 Days</span>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Weekly Focus Hours</h3>
+              <div class="chart-container">
+                <canvas id="weeklyHoursChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <h3>Subject Distribution</h3>
+              <div class="chart-container">
+                <canvas id="subjectDistributionChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Heatmap -->
+          <div class="heatmap-card">
+            <h3>Daily Focus Intensity (Last 30 Days)</h3>
+            <div class="heatmap-container">
+              <div class="heatmap-grid" id="heatmap-grid-blocks"></div>
+              <div class="heatmap-legend">
+                <span>Less</span>
+                <div class="legend-box level-0"></div>
+                <div class="legend-box level-1"></div>
+                <div class="legend-box level-2"></div>
+                <div class="legend-box level-3"></div>
+                <div class="legend-box level-4"></div>
+                <span>More</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: SETTINGS (Profile, Themes, Wipe options) -->
+      <div class="stage-view" id="view-settings">
+        <div class="stage-view-card glass-panel animate-scale-up">
+          <div class="card-header">
+            <h2>Settings & Environment</h2>
+            <p class="subtitle">Customize profile targets and aesthetics</p>
+          </div>
+
+          <div class="settings-grid">
+            <div class="settings-card">
+              <h3>Profile Settings</h3>
+              <form id="profile-form">
+                <div class="form-group">
+                  <label for="input-username">Username</label>
+                  <input type="text" id="input-username" class="form-control" value="FocusMaster" required>
+                </div>
+                <div class="form-group">
+                  <label for="input-status">Status Message</label>
+                  <input type="text" id="input-status" class="form-control" value="Studying hard for finals!">
+                </div>
+                <div class="form-group">
+                  <label for="input-daily-target">Daily Goal (Hours)</label>
+                  <input type="number" id="input-daily-target" class="form-control" value="6" min="1" max="24" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+              </form>
+            </div>
+
+            <div class="settings-card">
+              <h3>Workspace Aesthetics</h3>
+              <p class="desc">Toggle background color spectrum patterns.</p>
+              <div class="theme-selector">
+                <div class="theme-option active" data-theme="indigo-dark">
+                  <div class="theme-preview indigo-preview"></div>
+                  <span>Deep Indigo</span>
+                </div>
+                <div class="theme-option" data-theme="obsidian-dark">
+                  <div class="theme-preview obsidian-preview"></div>
+                  <span>Obsidian Night</span>
+                </div>
+                <div class="theme-option" data-theme="forest-dark">
+                  <div class="theme-preview forest-preview"></div>
+                  <span>Forest Moss</span>
+                </div>
+                <div class="theme-option" data-theme="classic-light">
+                  <div class="theme-preview light-preview"></div>
+                  <span>Classic Light</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card col-span-2">
+              <h3>Data Configurations</h3>
+              <div class="danger-zone">
+                <button class="btn btn-secondary" id="btn-export-data"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export Data</button>
+                <button class="btn btn-danger" id="btn-reset-data"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> Wipe Application</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom Bar: Music/Sounds Left, Navigation Menu Right -->
+    <footer class="bottom-dock-bar">
+      
+      <!-- Bottom Left: Ambient Sound Control Widget -->
+      <div class="bottom-left-dock">
+        <button class="dock-btn-circle" id="btn-toggle-soundboard" title="Ambient Sounds">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-music"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </button>
+
+        <!-- Floating Soundboard Panel (opens on top of button) -->
+        <div class="floating-soundboard glass-panel" id="floating-soundboard-widget">
+          <h4>Ambient Soundscapes</h4>
+          <div class="soundboard-list">
+            <div class="sound-item" data-sound="lofi">
+              <span>Lo-Fi Chill</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
+            <div class="sound-item" data-sound="rain">
+              <span>Rainfall</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
+            <div class="sound-item" data-sound="cafe">
+              <span>Cozy Cafe</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
+            <div class="sound-item" data-sound="forest">
+              <span>Forest Whispers</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
+            <div class="sound-item" data-sound="white">
+              <span>White Noise</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Right: Navigation Dock -->
+      <div class="bottom-right-dock">
+        <nav class="navigation-dock">
+          <button class="dock-btn active" data-tab="home" title="Home Space">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-home"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </button>
+          <button class="dock-btn" data-tab="focus" title="Focus Timer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hourglass"><path d="M5 2h14"/><path d="M5 22h14"/><path d="M19 2v4c0 1.38-1.13 2.5-2.5 2.5S14 7.12 14 5.75v-1.5"/><path d="M14 5.75c0 1.38-1.13 2.5-2.5 2.5S9 7.12 9 5.75v-1.5"/><path d="M9 5.75c0 1.38-1.13 2.5-2.5 2.5S4 7.12 4 5.75v-1.5"/><path d="M19 22v-4c0-1.38-1.13-2.5-2.5-2.5S14 16.88 14 18.25v1.5"/><path d="M14 18.25c0-1.38-1.13-2.5-2.5-2.5S9 16.88 9 18.25v1.5"/><path d="M9 18.25c0-1.38-1.13-2.5-2.5-2.5S4 16.88 4 18.25v1.5"/></svg>
+          </button>
+          <button class="dock-btn" data-tab="planner" title="Planner Tasks">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+          </button>
+          <button class="dock-btn" data-tab="insights" title="Focus Analytics">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bar-chart-2"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+          </button>
+          <button class="dock-btn" data-tab="settings" title="Profile Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <button class="dock-btn" id="btn-toggle-fullscreen" title="Toggle Fullscreen">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize-2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
+          </button>
+        </nav>
+      </div>
+
+    </footer>
+
+  </div>
+
+  <!-- ADD SUBJECT MODAL -->
+  <div class="modal-overlay" id="modal-subject">
+    <div class="modal-content glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3 id="subject-modal-title">Add New Subject</h3>
+        <button class="modal-close-btn" id="btn-close-subject-modal">&times;</button>
+      </div>
+      <form id="subject-form">
+        <div class="form-group">
+          <label for="subject-name">Subject Name</label>
+          <input type="text" id="subject-name" class="form-control" placeholder="e.g., Physics, Literature" required>
+        </div>
+        <div class="form-group">
+          <label>Subject Theme Color</label>
+          <div class="color-picker-grid">
+            <div class="color-dot active" style="background-color: #8b5cf6;" data-color="#8b5cf6"></div>
+            <div class="color-dot" style="background-color: #3b82f6;" data-color="#3b82f6"></div>
+            <div class="color-dot" style="background-color: #10b981;" data-color="#10b981"></div>
+            <div class="color-dot" style="background-color: #f59e0b;" data-color="#f59e0b"></div>
+            <div class="color-dot" style="background-color: #ec4899;" data-color="#ec4899"></div>
+            <div class="color-dot" style="background-color: #ef4444;" data-color="#ef4444"></div>
+            <div class="color-dot" style="background-color: #06b6d4;" data-color="#06b6d4"></div>
+            <div class="color-dot" style="background-color: #84cc16;" data-color="#84cc16"></div>
+            <div class="color-dot" style="background-color: #a78bfa;" data-color="#a78bfa"></div>
+            <div class="color-dot" style="background-color: #60a5fa;" data-color="#60a5fa"></div>
+            <div class="color-dot" style="background-color: #34d399;" data-color="#34d399"></div>
+            <div class="color-dot" style="background-color: #fbbf24;" data-color="#fbbf24"></div>
+            <div class="color-dot" style="background-color: #f472b6;" data-color="#f472b6"></div>
+            <div class="color-dot" style="background-color: #f87171;" data-color="#f87171"></div>
+            <div class="color-dot" style="background-color: #22d3ee;" data-color="#22d3ee"></div>
+            <div class="color-dot" style="background-color: #a3e635;" data-color="#a3e635"></div>
+          </div>
+          <div class="custom-color-input-wrapper" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.50rem;">
+            <label for="custom-subject-color" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin: 0;">Or choose custom color:</label>
+            <input type="color" id="custom-subject-color" class="custom-color-picker" value="#8b5cf6" style="border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; background: none; padding: 0;">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-subject">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD TODO TASK MODAL -->
+  <div class="modal-overlay" id="modal-todo">
+    <div class="modal-content glass-panel animate-scale-up">
+      <div class="modal-header">
+        <h3>Create New Task</h3>
+        <button class="modal-close-btn" id="btn-close-todo-modal">&times;</button>
+      </div>
+      <form id="todo-form">
+        <div class="form-group">
+          <label for="todo-title">Task Title</label>
+          <input type="text" id="todo-title" class="form-control" placeholder="e.g., Complete Chapter 5 exercises" required>
+        </div>
+        <div class="form-group">
+          <label for="todo-subject-select">Subject Association</label>
+          <select id="todo-subject-select" class="form-control" required>
+            <!-- Dynamically populated options -->
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-todo">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CHOOSE WALLPAPER MODAL -->
+  <div class="modal-overlay" id="modal-wallpaper">
+    <div class="modal-content glass-panel animate-scale-up" style="max-width: 580px; width: 90%;">
+      <div class="modal-header">
+        <h3>Choose Cozy Wallpaper</h3>
+        <button class="modal-close-btn" id="btn-close-wallpaper-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1rem 0 0 0;">
+        <div class="wallpaper-grid" id="wallpaper-options-grid">
+          <!-- Dynamically generated by JS -->
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top: 1.5rem; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-wallpaper">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUDIO ELEMENTS (Looped royalty-free streams & synthetic fallbacks handled in js) -->
+  <audio id="audio-lofi" loop src="https://cdn.freecodecamp.org/curriculum/js-music-player/scratching-the-surface.mp3"></audio>
+  <audio id="audio-rain" loop src="https://cdn.jsdelivr.net/gh/bradtraversy/ambient-sound-mixer@main/sounds/rain.mp3"></audio>
+  <audio id="audio-cafe" loop src="https://cdn.jsdelivr.net/gh/bradtraversy/ambient-sound-mixer@main/sounds/coffee-shop.mp3"></audio>
+  <audio id="audio-forest" loop src="https://cdn.jsdelivr.net/gh/bradtraversy/ambient-sound-mixer@main/sounds/forest.mp3"></audio>
+
+  <!-- Core Logic Script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
