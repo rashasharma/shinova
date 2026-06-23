@@ -1406,71 +1406,25 @@ function updateStreak() {
 // Ambient Audio Manager
 // ==========================================
 function playAmbientSound(soundKey, volume) {
-  if (soundKey === "white") {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    if (whiteNoiseSource) {
-      whiteNoiseSource.stop();
-    }
-
-    const bufferSize = 2 * audioCtx.sampleRate;
-    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
-    
-    whiteNoiseSource = audioCtx.createBufferSource();
-    whiteNoiseSource.buffer = noiseBuffer;
-    whiteNoiseSource.loop = true;
-    
-    whiteNoiseGain = audioCtx.createGain();
-    whiteNoiseGain.gain.setValueAtTime(volume, audioCtx.currentTime);
-    
-    whiteNoiseSource.connect(whiteNoiseGain);
-    whiteNoiseGain.connect(audioCtx.destination);
-    whiteNoiseSource.start();
-  } else {
-    const audioEl = document.getElementById(`audio-${soundKey}`);
-    if (audioEl) {
-      audioEl.volume = volume;
-      audioEl.play().catch(err => console.log("Audio autoplay prevented, click required.", err));
-    }
+  const audioEl = document.getElementById(`audio-${soundKey}`);
+  if (audioEl) {
+    audioEl.volume = volume;
+    audioEl.play().catch(err => console.log("Audio autoplay prevented, click required.", err));
   }
 }
 
 function stopAmbientSound(soundKey) {
-  if (soundKey === "white") {
-    if (whiteNoiseSource) {
-      try {
-        whiteNoiseSource.stop();
-      } catch (e) {}
-      whiteNoiseSource = null;
-    }
-  } else {
-    const audioEl = document.getElementById(`audio-${soundKey}`);
-    if (audioEl) {
-      audioEl.pause();
-      audioEl.currentTime = 0;
-    }
+  const audioEl = document.getElementById(`audio-${soundKey}`);
+  if (audioEl) {
+    audioEl.pause();
+    audioEl.currentTime = 0;
   }
 }
 
 function setAmbientVolume(soundKey, volume) {
-  if (soundKey === "white") {
-    if (whiteNoiseGain && audioCtx) {
-      whiteNoiseGain.gain.setValueAtTime(volume, audioCtx.currentTime);
-    }
-  } else {
-    const audioEl = document.getElementById(`audio-${soundKey}`);
-    if (audioEl) {
-      audioEl.volume = volume;
-    }
+  const audioEl = document.getElementById(`audio-${soundKey}`);
+  if (audioEl) {
+    audioEl.volume = volume;
   }
 }
 

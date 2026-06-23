@@ -42,9 +42,6 @@
       <!-- VIEW: HOME (Default ambient clock + subject picker) -->
       <div class="stage-view active" id="view-home">
         <div class="view-home-content animate-fade-in">
-          <div class="greeting-message">
-            The perfect day for focus, <span id="home-username">Shinova User</span>
-          </div>
           <!-- Huge typography clock -->
           <div class="large-clock" id="local-clock-display">00:00</div>
           
@@ -298,8 +295,8 @@
         <div class="floating-soundboard glass-panel" id="floating-soundboard-widget">
           <h4>Ambient Soundscapes</h4>
           <div class="soundboard-list">
-            <div class="sound-item" data-sound="lofi">
-              <span>Lo-Fi Chill</span>
+            <div class="sound-item" data-sound="rain">
+              <span>Rain & Thunder</span>
               <div class="sound-controls">
                 <button class="sound-toggle-btn">
                   <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
@@ -308,8 +305,8 @@
                 <input type="range" class="sound-volume" min="0" max="100" value="50">
               </div>
             </div>
-            <div class="sound-item" data-sound="rain">
-              <span>Rainfall</span>
+            <div class="sound-item" data-sound="library">
+              <span>Library Ambience</span>
               <div class="sound-controls">
                 <button class="sound-toggle-btn">
                   <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
@@ -328,8 +325,18 @@
                 <input type="range" class="sound-volume" min="0" max="100" value="50">
               </div>
             </div>
-            <div class="sound-item" data-sound="forest">
-              <span>Forest Whispers</span>
+            <div class="sound-item" data-sound="pages">
+              <span>Flipping Pages</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
+            <div class="sound-item" data-sound="winter">
+              <span>Winter Morning</span>
               <div class="sound-controls">
                 <button class="sound-toggle-btn">
                   <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
@@ -469,11 +476,13 @@
     </div>
   </div>
 
-  <!-- AUDIO ELEMENTS (Looped royalty-free streams & synthetic fallbacks handled in js) -->
-  <audio id="audio-lofi" loop src="https://cdn.freecodecamp.org/curriculum/js-music-player/scratching-the-surface.mp3"></audio>
-  <audio id="audio-rain" loop src="https://cdn.jsdelivr.net/gh/bradtraversy/ambient-sound-mixer@main/sounds/rain.mp3"></audio>
-  <audio id="audio-cafe" loop src="https://cdn.jsdelivr.net/gh/bradtraversy/ambient-sound-mixer@main/sounds/coffee-shop.mp3"></audio>
-  <audio id="audio-forest" loop src="https://cdn.jsdelivr.net/gh/bradtraversy/ambient-sound-mixer@main/sounds/forest.mp3"></audio>
+  <!-- AUDIO ELEMENTS (Local high-quality assets) -->
+  <audio id="audio-rain" loop src="sounds/Rain and Thunder.mp3"></audio>
+  <audio id="audio-library" loop src="sounds/Library Ambience.mp3"></audio>
+  <audio id="audio-cafe" loop src="sounds/Cafe Sounds.mp3"></audio>
+  <audio id="audio-pages" loop src="sounds/Flipping Pages.mp3"></audio>
+  <audio id="audio-winter" loop src="sounds/Winter Morning.mp3"></audio>
+  <audio id="audio-white" loop src="sounds/White Noise.mp3"></audio>
 
   <!-- Core Logic Script -->
   <script type="module" src="app.js"></script>

@@ -374,6 +374,13 @@ body {
   user-select: none;
 }
 
+#local-clock-display {
+  font-size: 13rem;
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+  margin-bottom: 1.5rem;
+}
+
 .today-focus-total {
   font-size: 1.05rem;
   font-weight: 500;
@@ -1360,6 +1367,9 @@ body {
   }
   .large-clock {
     font-size: 5.5rem;
+  }
+  #local-clock-display {
+    font-size: 8rem;
   }
   .clickable-timer {
     font-size: 6rem;
