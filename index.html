@@ -296,6 +296,16 @@
                 <input type="range" class="sound-volume" min="0" max="100" value="50">
               </div>
             </div>
+            <div class="sound-item" data-sound="beach">
+              <span>Beach Waves</span>
+              <div class="sound-controls">
+                <button class="sound-toggle-btn">
+                  <span class="icon-play-sound"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></span>
+                  <span class="icon-pause-sound hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></span>
+                </button>
+                <input type="range" class="sound-volume" min="0" max="100" value="50">
+              </div>
+            </div>
             <div class="sound-item" data-sound="library">
               <span>Library Ambience</span>
               <div class="sound-controls">
@@ -493,6 +503,7 @@
   </div>
 
   <!-- AUDIO ELEMENTS (Local high-quality assets) -->
+  <audio id="audio-beach" loop src="sounds/Beach Waves.mp3"></audio>
   <audio id="audio-rain" loop src="sounds/Rain and Thunder.mp3"></audio>
   <audio id="audio-library" loop src="sounds/Library Ambience.mp3"></audio>
   <audio id="audio-cafe" loop src="sounds/Cafe Sounds.mp3"></audio>
