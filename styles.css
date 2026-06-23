@@ -1418,6 +1418,14 @@ body {
   -webkit-backdrop-filter: blur(25px);
 }
 
+.subject-dropdown-item-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
 .subject-dropdown-item {
   display: flex;
   align-items: center;
@@ -1428,14 +1436,34 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  width: 100%;
   border: none;
   background: none;
   text-align: left;
+  flex-grow: 1;
 }
 
-.subject-dropdown-item:hover {
+.subject-dropdown-item-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 6px;
+}
+
+.subject-dropdown-item-delete:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.subject-dropdown-item:hover,
+.subject-dropdown-item-row:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 

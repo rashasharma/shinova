@@ -413,6 +413,7 @@ function deleteSubject(subjectId) {
   appState.subjects = appState.subjects.filter(s => s.id !== subjectId);
   localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
   renderHomeSubjects();
+  renderSubjectDropdown();
   if (activeSubjectId === subjectId) {
     exitFocusSession();
   }
@@ -1118,16 +1119,19 @@ function renderSubjectDropdown() {
   dropdown.innerHTML = "";
 
   appState.subjects.forEach(sub => {
-    const item = document.createElement("button");
-    item.className = "subject-dropdown-item";
-    item.style.setProperty("--subj-color", sub.color);
-    item.innerHTML = `
+    const row = document.createElement("div");
+    row.className = "subject-dropdown-item-row";
+    row.style.setProperty("--subj-color", sub.color);
+
+    const selectBtn = document.createElement("button");
+    selectBtn.className = "subject-dropdown-item";
+    selectBtn.innerHTML = `
       <span class="color-dot"></span>
-      <span style="flex-grow: 1;">${sub.name}</span>
+      <span style="flex-grow: 1; text-align: left;">${sub.name}</span>
       ${sub.id === activeSubjectId ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check" style="opacity:0.8; margin-left: 4px;"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
     `;
 
-    item.addEventListener("click", (e) => {
+    selectBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       dropdown.style.display = "none";
       if (sub.id !== activeSubjectId) {
@@ -1135,7 +1139,23 @@ function renderSubjectDropdown() {
       }
     });
 
-    dropdown.appendChild(item);
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "subject-dropdown-item-delete";
+    deleteBtn.setAttribute("title", "Delete Subject");
+    deleteBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+    `;
+
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (confirm(`Are you sure you want to delete "${sub.name}"? This will not delete its past study logs.`)) {
+        deleteSubject(sub.id);
+      }
+    });
+
+    row.appendChild(selectBtn);
+    row.appendChild(deleteBtn);
+    dropdown.appendChild(row);
   });
 
   // Divider
