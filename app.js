@@ -3,18 +3,7 @@
 // ==========================================
 // Application State & Storage
 // ==========================================
-const DEFAULT_SUBJECTS = [
-  { id: "sub-1", name: "Mathematics", color: "#3b82f6", totalTime: 9600 },  // 2h 40m today
-  { id: "sub-2", name: "Science", color: "#10b981", totalTime: 5400 },      // 1h 30m today
-  { id: "sub-3", name: "World History", color: "#f59e0b", totalTime: 0 },
-  { id: "sub-4", name: "Literature", color: "#ec4899", totalTime: 2400 }     // 40m today
-];
-
-const DEFAULT_TODOS = [
-  { id: "todo-1", subjectId: "sub-1", title: "Complete algebra chapter 3 homework", completed: true, date: new Date().toISOString().split('T')[0] },
-  { id: "todo-2", subjectId: "sub-2", title: "Write chemistry lab report", completed: false, date: new Date().toISOString().split('T')[0] },
-  { id: "todo-3", subjectId: "sub-4", title: "Read Act II of Hamlet", completed: false, date: new Date().toISOString().split('T')[0] }
-];
+// Pre-populated defaults removed for a clean start
 
 const MOTIVATIONAL_QUOTES = [
   { text: "The only place where success comes before work is in the dictionary.", author: "Vidal Sassoon" },
@@ -73,7 +62,7 @@ let appState = {
     status: "Studying hard for finals!",
     targetDaily: 6, // 6 hours
     theme: "indigo-dark",
-    streak: 5,
+    streak: 0,
     activeWallpaper: "aurora"
   },
   subjects: [],
@@ -194,10 +183,10 @@ function initData() {
     appState.todos = localTodos ? JSON.parse(localTodos) : [];
     appState.logs = localLogs ? JSON.parse(localLogs) : [];
   } else {
-    // First time loading, pre-populate default demo data
-    appState.subjects = DEFAULT_SUBJECTS;
-    appState.todos = DEFAULT_TODOS;
-    appState.logs = generateMockLogs();
+    // First time loading, start with clean empty state
+    appState.subjects = [];
+    appState.todos = [];
+    appState.logs = [];
     
     localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
     localStorage.setItem("ypt_todos", JSON.stringify(appState.todos));
@@ -232,77 +221,6 @@ function updateTodayTimesFromLogs() {
   setElementText("today-total-time-home", formatDurationHMS(todayTotalSeconds));
   
   localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
-}
-
-// Generate last 7 days of logs to populate charts immediately
-function generateMockLogs() {
-  const logs = [];
-  const today = new Date();
-  const subjectIds = ["sub-1", "sub-2", "sub-4"];
-  
-  // Today's logs (matching default times in DEFAULT_SUBJECTS)
-  const todayStr = getLocalDateString(today);
-  logs.push({
-    id: "log-mock-t1",
-    subjectId: "sub-1",
-    startTime: `${todayStr}T09:00:00.000Z`,
-    duration: 9600
-  });
-  logs.push({
-    id: "log-mock-t2",
-    subjectId: "sub-2",
-    startTime: `${todayStr}T13:00:00.000Z`,
-    duration: 5400
-  });
-  logs.push({
-    id: "log-mock-t3",
-    subjectId: "sub-4",
-    startTime: `${todayStr}T16:30:00.000Z`,
-    duration: 2400
-  });
-
-  // Last 6 days logs (varying amounts)
-  for (let i = 1; i <= 6; i++) {
-    const logDate = new Date();
-    logDate.setDate(today.getDate() - i);
-    const dateStr = getLocalDateString(logDate);
-
-    const studyHours = 1.5 + Math.random() * 4;
-    const durationSeconds = Math.floor(studyHours * 3600);
-    
-    let remaining = durationSeconds;
-    let subIdx = 0;
-    while (remaining > 0 && subIdx < subjectIds.length) {
-      const subShare = Math.min(remaining, Math.floor((0.3 + Math.random() * 0.5) * durationSeconds));
-      logs.push({
-        id: `log-mock-${i}-${subIdx}`,
-        subjectId: subjectIds[subIdx],
-        startTime: `${dateStr}T${10 + subIdx * 3}:00:00.000Z`,
-        duration: subShare
-      });
-      remaining -= subShare;
-      subIdx++;
-    }
-  }
-
-  // Pre-populate some historical heatmap data going back 30 days
-  for (let i = 7; i < 30; i++) {
-    const heatDate = new Date();
-    heatDate.setDate(today.getDate() - i);
-    const dateStr = getLocalDateString(heatDate);
-    
-    if (Math.random() > 0.4) {
-      const hours = 1 + Math.random() * 6;
-      logs.push({
-        id: `log-mock-hist-${i}`,
-        subjectId: subjectIds[Math.floor(Math.random() * subjectIds.length)],
-        startTime: `${dateStr}T11:00:00.000Z`,
-        duration: Math.floor(hours * 3600)
-      });
-    }
-  }
-
-  return logs;
 }
 
 // ==========================================
