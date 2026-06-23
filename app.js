@@ -63,7 +63,7 @@ let appState = {
     targetDaily: 6, // 6 hours
     theme: "indigo-dark",
     streak: 0,
-    activeWallpaper: "aurora"
+    activeWallpaper: "cafe-2"
   },
   subjects: [],
   logs: [],
@@ -182,7 +182,7 @@ function initData() {
   if (localUser) {
     appState.user = JSON.parse(localUser);
     if (!appState.user.activeWallpaper) {
-      appState.user.activeWallpaper = "aurora";
+      appState.user.activeWallpaper = "cafe-2";
     }
   } else {
     localStorage.setItem("ypt_user", JSON.stringify(appState.user));
@@ -236,16 +236,26 @@ function updateTodayTimesFromLogs() {
 // Theme manager
 // ==========================================
 function applyTheme(themeName) {
+  // Normalize old themes to dark theme if any
+  if (themeName !== "classic-light") {
+    themeName = "indigo-dark";
+  }
+
   document.documentElement.setAttribute("data-theme", themeName);
   
-  // Update selection UI in settings
-  document.querySelectorAll(".theme-option").forEach(opt => {
-    if (opt.getAttribute("data-theme") === themeName) {
-      opt.classList.add("active");
-    } else {
-      opt.classList.remove("active");
-    }
-  });
+  const sunIcon = document.getElementById("theme-toggle-icon-sun");
+  const moonIcon = document.getElementById("theme-toggle-icon-moon");
+  const toggleText = document.getElementById("theme-toggle-text");
+  
+  if (themeName === "classic-light") {
+    if (sunIcon) sunIcon.classList.add("hidden");
+    if (moonIcon) moonIcon.classList.remove("hidden");
+    if (toggleText) toggleText.innerText = "Light Mode";
+  } else {
+    if (sunIcon) sunIcon.classList.remove("hidden");
+    if (moonIcon) moonIcon.classList.add("hidden");
+    if (toggleText) toggleText.innerText = "Dark Mode";
+  }
 
   if (window.Chart) {
     updateChartsThemes();
@@ -820,15 +830,18 @@ function initSettings() {
     });
   }
 
-  // Theme option selection
-  document.querySelectorAll(".theme-option").forEach(opt => {
-    opt.addEventListener("click", () => {
-      const theme = opt.getAttribute("data-theme");
-      appState.user.theme = theme;
+  // Theme toggle button selection (Light/Dark Mode)
+  const toggleThemeBtn = document.getElementById("btn-toggle-theme");
+  if (toggleThemeBtn) {
+    toggleThemeBtn.addEventListener("click", () => {
+      const currentTheme = document.documentElement.getAttribute("data-theme");
+      const newTheme = currentTheme === "classic-light" ? "indigo-dark" : "classic-light";
+      
+      appState.user.theme = newTheme;
       localStorage.setItem("ypt_user", JSON.stringify(appState.user));
-      applyTheme(theme);
+      applyTheme(newTheme);
     });
-  });
+  }
 
   // Backup Export
   const exportBtn = document.getElementById("btn-export-data");

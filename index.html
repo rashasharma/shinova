@@ -245,30 +245,21 @@
                 <button type="submit" class="btn btn-primary">Save Changes</button>
               </form>
             </div>
-
             <div class="settings-card">
               <h3>Workspace Aesthetics</h3>
-              <p class="desc">Toggle background color spectrum patterns.</p>
-              <div class="theme-selector">
-                <div class="theme-option active" data-theme="indigo-dark">
-                  <div class="theme-preview indigo-preview"></div>
-                  <span>Deep Indigo</span>
-                </div>
-                <div class="theme-option" data-theme="obsidian-dark">
-                  <div class="theme-preview obsidian-preview"></div>
-                  <span>Obsidian Night</span>
-                </div>
-                <div class="theme-option" data-theme="forest-dark">
-                  <div class="theme-preview forest-preview"></div>
-                  <span>Forest Moss</span>
-                </div>
-                <div class="theme-option" data-theme="classic-light">
-                  <div class="theme-preview light-preview"></div>
-                  <span>Classic Light</span>
-                </div>
+              <p class="desc">Switch between light and dark visual aesthetics.</p>
+              <div style="margin-top: 1.25rem;">
+                <button type="button" class="btn btn-secondary" id="btn-toggle-theme" style="display: inline-flex; align-items: center; gap: 8px; justify-content: center; width: 100%;">
+                  <span id="theme-toggle-icon-sun">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                  </span>
+                  <span id="theme-toggle-icon-moon" class="hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                  </span>
+                  <span id="theme-toggle-text">Dark Mode</span>
+                </button>
               </div>
             </div>
-
             <div class="settings-card col-span-2">
               <h3>Data Configurations</h3>
               <div class="danger-zone">
