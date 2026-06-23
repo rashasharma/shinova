@@ -154,10 +154,20 @@ document.addEventListener("DOMContentLoaded", () => {
   initFocusMode();
   initModals();
   initWallpaperManager();
+  initOnboarding();
   
   // Render lucide icons
   if (window.lucide) {
     lucide.createIcons();
+  }
+
+  // Trigger Onboarding Modal if not initialized
+  const isInitialized = localStorage.getItem("ypt_initialized");
+  if (isInitialized !== "true") {
+    const onboardingModal = document.getElementById("modal-onboarding");
+    if (onboardingModal) {
+      onboardingModal.classList.add("active");
+    }
   }
 });
 
@@ -191,7 +201,6 @@ function initData() {
     localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
     localStorage.setItem("ypt_todos", JSON.stringify(appState.todos));
     localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
-    localStorage.setItem("ypt_initialized", "true");
   }
 
   // Sync today's times from logs
@@ -1369,6 +1378,7 @@ function initModals() {
   document.querySelectorAll(".modal-overlay").forEach(overlay => {
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) {
+        if (overlay.id === "modal-onboarding") return; // Prevent closing onboarding by clicking outside
         overlay.classList.remove("active");
       }
     });
@@ -1653,5 +1663,43 @@ function initWallpaperManager() {
   // Initialize background state on startup
   if (appState.user.activeWallpaper) {
     applyWallpaper(appState.user.activeWallpaper);
+  }
+}
+
+// ==========================================
+// Onboarding Manager (First Time Welcome Setup)
+// ==========================================
+function initOnboarding() {
+  const onboardingForm = document.getElementById("onboarding-form");
+  if (onboardingForm) {
+    onboardingForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      
+      const usernameInput = document.getElementById("onboarding-username");
+      const targetInput = document.getElementById("onboarding-daily-target");
+      
+      const username = usernameInput ? usernameInput.value.trim() : "FocusMaster";
+      const targetHours = targetInput ? parseInt(targetInput.value) : 6;
+      
+      // Update appState
+      appState.user.username = username || "FocusMaster";
+      appState.user.targetDaily = targetHours || 6;
+      
+      // Save state
+      localStorage.setItem("ypt_user", JSON.stringify(appState.user));
+      localStorage.setItem("ypt_initialized", "true");
+      
+      // Update Settings fields so they match
+      const settingsUsername = document.getElementById("input-username");
+      const settingsTarget = document.getElementById("input-daily-target");
+      if (settingsUsername) settingsUsername.value = appState.user.username;
+      if (settingsTarget) settingsTarget.value = appState.user.targetDaily;
+      
+      // Close onboarding modal
+      const onboardingModal = document.getElementById("modal-onboarding");
+      if (onboardingModal) {
+        onboardingModal.classList.remove("active");
+      }
+    });
   }
 }

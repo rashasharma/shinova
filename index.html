@@ -476,6 +476,31 @@
     </div>
   </div>
 
+  <!-- ONBOARDING / SETUP MODAL -->
+  <div class="modal-overlay" id="modal-onboarding">
+    <div class="modal-content glass-panel animate-scale-up" style="max-width: 420px; width: 90%;">
+      <div class="modal-header">
+        <h3>Welcome to Shinova</h3>
+      </div>
+      <form id="onboarding-form">
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+          Let's set up your profile to start your productivity journey.
+        </p>
+        <div class="form-group">
+          <label for="onboarding-username">Your Username</label>
+          <input type="text" id="onboarding-username" class="form-control" placeholder="e.g., FocusMaster" required>
+        </div>
+        <div class="form-group">
+          <label for="onboarding-daily-target">Daily Focus Goal (Hours)</label>
+          <input type="number" id="onboarding-daily-target" class="form-control" min="1" max="24" value="6" required>
+        </div>
+        <div class="modal-actions" style="margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" style="width: 100%;">Get Started</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- AUDIO ELEMENTS (Local high-quality assets) -->
   <audio id="audio-rain" loop src="sounds/Rain and Thunder.mp3"></audio>
   <audio id="audio-library" loop src="sounds/Library Ambience.mp3"></audio>
