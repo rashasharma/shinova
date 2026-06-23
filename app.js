@@ -847,7 +847,6 @@ function initSettings() {
     resetBtn.addEventListener("click", () => {
       if (confirm("WARNING: This will completely erase all subjects, study logs, task items, and reset all streaks. Do you want to continue?")) {
         localStorage.clear();
-        localStorage.setItem("ypt_initialized", "true");
         alert("Application database cleared. Reloading page...");
         window.location.reload();
       }
