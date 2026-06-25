@@ -1660,8 +1660,9 @@ function initWallpaperManager() {
       } else {
         item.className = "wallpaper-option";
         item.setAttribute("data-id", w.id);
+        const thumbUrl = w.url.replace("backgrounds/", "backgrounds/thumbnails/");
         item.innerHTML = `
-          <img src="${w.url}" alt="${w.name}" loading="lazy">
+          <img src="${thumbUrl}" alt="${w.name}" loading="lazy">
           <span class="wallpaper-option-name">${w.name}</span>
         `;
       }
