@@ -502,6 +502,44 @@
     </div>
   </div>
 
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- CUSTOM CONFIRM MODAL -->
+  <div class="modal-overlay" id="modal-custom-confirm" style="z-index: 11000;">
+    <div class="modal-content glass-panel animate-scale-up" style="max-width: 400px; width: 90%;">
+      <div class="modal-header">
+        <h3 id="custom-confirm-title">Confirm Action</h3>
+      </div>
+      <div class="modal-body" style="padding: 1rem 0;">
+        <p id="custom-confirm-message" style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4; margin: 0;"></p>
+      </div>
+      <div class="modal-actions" style="margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" id="btn-custom-confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-custom-confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM PROMPT MODAL -->
+  <div class="modal-overlay" id="modal-custom-prompt" style="z-index: 11000;">
+    <div class="modal-content glass-panel animate-scale-up" style="max-width: 400px; width: 90%;">
+      <div class="modal-header">
+        <h3 id="custom-prompt-title">Enter Value</h3>
+      </div>
+      <form id="custom-prompt-form">
+        <div class="modal-body" style="padding: 1rem 0;">
+          <p id="custom-prompt-message" style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4; margin: 0 0 1rem 0;"></p>
+          <input type="text" id="custom-prompt-input" class="form-control" required style="width: 100%;">
+        </div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+          <button type="button" class="btn btn-secondary" id="btn-custom-prompt-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-custom-prompt-ok">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- AUDIO ELEMENTS (Local high-quality assets) -->
   <audio id="audio-beach" loop src="sounds/Beach Waves.mp3"></audio>
   <audio id="audio-rain" loop src="sounds/Rain and Thunder.mp3"></audio>

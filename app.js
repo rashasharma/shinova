@@ -155,6 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initModals();
   initWallpaperManager();
   initOnboarding();
+  initCustomDialogs();
   
   // Render lucide icons
   if (window.lucide) {
@@ -402,11 +403,11 @@ function renderHomeSubjects() {
     `;
 
     // Click behavior
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       // If clicked the delete cross
       if (e.target.classList.contains("delete-subj-btn")) {
         e.stopPropagation();
-        if (confirm(`Are you sure you want to delete "${sub.name}"? This will not delete its past study logs.`)) {
+        if (await showConfirm(`Are you sure you want to delete "${sub.name}"? This will not delete its past study logs.`)) {
           deleteSubject(sub.id);
         }
         return;
@@ -826,7 +827,7 @@ function initSettings() {
       const homeUserEl = document.getElementById("home-username");
       if (homeUserEl) homeUserEl.innerText = appState.user.username;
       
-      alert("Profile saved successfully!");
+      showToast("Profile saved successfully!", "success");
     });
   }
 
@@ -858,11 +859,13 @@ function initSettings() {
   // Application Wipe
   const resetBtn = document.getElementById("btn-reset-data");
   if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      if (confirm("WARNING: This will completely erase all subjects, study logs, task items, and reset all streaks. Do you want to continue?")) {
+    resetBtn.addEventListener("click", async () => {
+      if (await showConfirm("WARNING: This will completely erase all subjects, study logs, task items, and reset all streaks. Do you want to continue?")) {
         localStorage.clear();
-        alert("Application database cleared. Reloading page...");
-        window.location.reload();
+        showToast("Application database cleared. Reloading page...", "danger");
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
       }
     });
   }
@@ -944,8 +947,8 @@ function initFocusMode() {
 
   // Exit & Save Focus Session
   if (btnExit) {
-    btnExit.addEventListener("click", () => {
-      if (confirm("End study session and save progress?")) {
+    btnExit.addEventListener("click", async () => {
+      if (await showConfirm("End study session and save progress?")) {
         exitFocusSession();
       }
     });
@@ -953,16 +956,18 @@ function initFocusMode() {
 
   // Stopwatch vs Countdown timer mode toggle
   if (btnModeToggle) {
-    btnModeToggle.addEventListener("click", () => {
+    btnModeToggle.addEventListener("click", async () => {
       if (timerRunning) return; // Block switches during active sessions
       
       if (currentMode === "stopwatch") {
+        const userMins = await showPrompt("Enter countdown minutes:", "25");
+        if (userMins === null) return; // Cancelled
+        
         currentMode = "timer";
         document.getElementById("focus-mode-icon-stopwatch").classList.add("hidden");
         document.getElementById("focus-mode-icon-timer").classList.remove("hidden");
         setElementText("focus-mode-name", "Countdown");
         
-        const userMins = prompt("Enter countdown minutes:", "25");
         const mins = parseInt(userMins) || 25;
         countdownDuration = mins * 60;
         countdownRemaining = countdownDuration;
@@ -1159,9 +1164,9 @@ function renderSubjectDropdown() {
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
     `;
 
-    deleteBtn.addEventListener("click", (e) => {
+    deleteBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (confirm(`Are you sure you want to delete "${sub.name}"? This will not delete its past study logs.`)) {
+      if (await showConfirm(`Are you sure you want to delete "${sub.name}"? This will not delete its past study logs.`)) {
         deleteSubject(sub.id);
       }
     });
@@ -1229,7 +1234,7 @@ function startTimer() {
       if (countdownRemaining <= 0) {
         clearInterval(timerInterval);
         timerRunning = false;
-        alert("Focus block completed! Time for a rest.");
+        showToast("Focus block completed! Time for a rest.", "success");
         startRest();
       }
     }
@@ -1410,7 +1415,17 @@ function initModals() {
   document.querySelectorAll(".modal-overlay").forEach(overlay => {
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) {
-        if (overlay.id === "modal-onboarding") return; // Prevent closing onboarding by clicking outside
+        if (overlay.id === "modal-onboarding") return;
+        if (overlay.id === "modal-custom-confirm") {
+          overlay.classList.remove("active");
+          if (confirmPromiseResolve) confirmPromiseResolve(false);
+          return;
+        }
+        if (overlay.id === "modal-custom-prompt") {
+          overlay.classList.remove("active");
+          if (promptPromiseResolve) promptPromiseResolve(null);
+          return;
+        }
         overlay.classList.remove("active");
       }
     });
@@ -1523,7 +1538,7 @@ function initModals() {
       selectEl.innerHTML = "";
       
       if (appState.subjects.length === 0) {
-        alert("Please add at least one subject first before creating tasks.");
+        showToast("Please add at least one subject first before creating tasks.", "warning");
         return;
       }
 
@@ -1732,6 +1747,118 @@ function initOnboarding() {
       if (onboardingModal) {
         onboardingModal.classList.remove("active");
       }
+    });
+  }
+}
+
+// ==========================================
+// Custom Dialog & Toast System
+// ==========================================
+let confirmPromiseResolve = null;
+let promptPromiseResolve = null;
+
+function showToast(message, type = "success") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  
+  let icon = "";
+  if (type === "success") {
+    icon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+  } else if (type === "warning" || type === "danger") {
+    icon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`;
+  } else {
+    icon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
+  }
+
+  toast.innerHTML = `
+    <span>${icon}</span>
+    <span style="flex-grow: 1;">${message}</span>
+  `;
+
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add("show"), 10);
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+function showConfirm(message, confirmText = "Confirm", cancelText = "Cancel") {
+  return new Promise((resolve) => {
+    confirmPromiseResolve = resolve;
+    
+    document.getElementById("custom-confirm-message").innerText = message;
+    document.getElementById("btn-custom-confirm-ok").innerText = confirmText;
+    document.getElementById("btn-custom-confirm-cancel").innerText = cancelText;
+    
+    const okBtn = document.getElementById("btn-custom-confirm-ok");
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.includes("delete") || lowerMsg.includes("erase") || lowerMsg.includes("wipe") || lowerMsg.includes("clear")) {
+      okBtn.className = "btn btn-danger";
+    } else {
+      okBtn.className = "btn btn-primary";
+    }
+
+    document.getElementById("modal-custom-confirm").classList.add("active");
+  });
+}
+
+function showPrompt(message, defaultValue = "", placeholder = "") {
+  return new Promise((resolve) => {
+    promptPromiseResolve = resolve;
+    
+    document.getElementById("custom-prompt-message").innerText = message;
+    const inputEl = document.getElementById("custom-prompt-input");
+    if (inputEl) {
+      inputEl.value = defaultValue;
+      inputEl.placeholder = placeholder;
+      setTimeout(() => inputEl.focus(), 150);
+    }
+    
+    document.getElementById("modal-custom-prompt").classList.add("active");
+  });
+}
+
+function initCustomDialogs() {
+  const btnOk = document.getElementById("btn-custom-confirm-ok");
+  const btnCancel = document.getElementById("btn-custom-confirm-cancel");
+  const modalConfirm = document.getElementById("modal-custom-confirm");
+
+  if (btnOk) {
+    btnOk.addEventListener("click", () => {
+      if (modalConfirm) modalConfirm.classList.remove("active");
+      if (confirmPromiseResolve) confirmPromiseResolve(true);
+    });
+  }
+
+  if (btnCancel) {
+    btnCancel.addEventListener("click", () => {
+      if (modalConfirm) modalConfirm.classList.remove("active");
+      if (confirmPromiseResolve) confirmPromiseResolve(false);
+    });
+  }
+
+  const promptForm = document.getElementById("custom-prompt-form");
+  const btnPromptCancel = document.getElementById("btn-custom-prompt-cancel");
+  const modalPrompt = document.getElementById("modal-custom-prompt");
+
+  if (promptForm) {
+    promptForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const value = document.getElementById("custom-prompt-input").value.trim();
+      if (modalPrompt) modalPrompt.classList.remove("active");
+      if (promptPromiseResolve) promptPromiseResolve(value);
+    });
+  }
+
+  if (btnPromptCancel) {
+    btnPromptCancel.addEventListener("click", () => {
+      if (modalPrompt) modalPrompt.classList.remove("active");
+      if (promptPromiseResolve) promptPromiseResolve(null);
     });
   }
 }
