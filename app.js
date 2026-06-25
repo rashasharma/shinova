@@ -1020,24 +1020,7 @@ function initFocusMode() {
     });
   }
 
-  // Sound panel floating popover toggler
-  const soundboardToggle = document.getElementById("btn-toggle-soundboard");
-  const soundboardWidget = document.getElementById("floating-soundboard-widget");
 
-  if (soundboardToggle && soundboardWidget) {
-    soundboardToggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      soundboardWidget.classList.toggle("active");
-      soundboardToggle.classList.toggle("active");
-    });
-
-    document.addEventListener("click", (e) => {
-      if (soundboardWidget.classList.contains("active") && !soundboardWidget.contains(e.target) && e.target !== soundboardToggle) {
-        soundboardWidget.classList.remove("active");
-        soundboardToggle.classList.remove("active");
-      }
-    });
-  }
 
   // Sound play selectors & independent volume controls
   document.querySelectorAll(".sound-item").forEach(item => {
@@ -1908,9 +1891,41 @@ function initCustomDialogs() {
 function initMusicSpace() {
   loadYouTubeAPI();
   const musicToggleBtn = document.getElementById("btn-toggle-music");
+  const soundboardToggleBtn = document.getElementById("btn-toggle-soundboard");
   const musicWidget = document.getElementById("floating-music-widget");
   const globalPlayer = document.getElementById("music-global-player");
   const fileInput = document.getElementById("music-local-file-input");
+
+  function openMusicWidgetWithTab(tabId, toggleBtn) {
+    const tabButtons = document.querySelectorAll(".music-tab-btn");
+    tabButtons.forEach(btn => {
+      if (btn.getAttribute("data-music-tab") === tabId) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+    document.querySelectorAll(".music-tab-content").forEach(content => {
+      if (content.id === `music-tab-${tabId}`) {
+        content.classList.add("active");
+      } else {
+        content.classList.remove("active");
+      }
+    });
+
+    if (tabId === "queue") renderMusicQueue();
+    else if (tabId === "library") renderMusicLibrary();
+
+    if (musicWidget) musicWidget.classList.add("active");
+    if (musicToggleBtn) musicToggleBtn.classList.toggle("active", musicToggleBtn === toggleBtn);
+    if (soundboardToggleBtn) soundboardToggleBtn.classList.toggle("active", soundboardToggleBtn === toggleBtn);
+  }
+
+  function closeMusicWidget() {
+    if (musicWidget) musicWidget.classList.remove("active");
+    if (musicToggleBtn) musicToggleBtn.classList.remove("active");
+    if (soundboardToggleBtn) soundboardToggleBtn.classList.remove("active");
+  }
   
   // Tab Switchers
   const tabButtons = document.querySelectorAll(".music-tab-btn");
@@ -1937,45 +1952,59 @@ function initMusicSpace() {
     });
   });
 
-  // Toggle Widget Panel
+  // Toggle Widget Panel via buttons
   if (musicToggleBtn && musicWidget) {
     musicToggleBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      
-      // Close soundboard if open
-      const soundboardWidget = document.getElementById("floating-soundboard-widget");
-      const soundboardToggle = document.getElementById("btn-toggle-soundboard");
-      if (soundboardWidget) soundboardWidget.classList.remove("active");
-      if (soundboardToggle) soundboardToggle.classList.remove("active");
-      
-      musicWidget.classList.toggle("active");
-      musicToggleBtn.classList.toggle("active");
-      
-      if (musicWidget.classList.contains("active")) {
-        const activeTab = document.querySelector(".music-tab-btn.active").getAttribute("data-music-tab");
-        if (activeTab === "library") renderMusicLibrary();
-        else if (activeTab === "queue") renderMusicQueue();
-      }
-    });
+      const isActive = musicWidget.classList.contains("active");
+      const activeTabBtn = document.querySelector(".music-tab-btn.active");
+      const activeTab = activeTabBtn ? activeTabBtn.getAttribute("data-music-tab") : "player";
 
-    // Close when clicking outside
-    document.addEventListener("click", (e) => {
-      // If the clicked element is no longer in the DOM (e.g. removed during library re-render),
-      // we assume it was inside the widget and do not close it.
-      if (!document.body.contains(e.target)) return;
-
-      if (musicWidget.classList.contains("active") && !musicWidget.contains(e.target) && e.target !== musicToggleBtn) {
-        // Only close if we are not clicking inside the "Add Track" modal or custom prompts
-        const trackModal = document.getElementById("modal-add-track");
-        if (trackModal && trackModal.classList.contains("active")) return;
-        const confirmModal = document.getElementById("modal-custom-confirm");
-        if (confirmModal && confirmModal.classList.contains("active")) return;
-
-        musicWidget.classList.remove("active");
-        musicToggleBtn.classList.remove("active");
+      if (isActive && activeTab !== "ambient") {
+        closeMusicWidget();
+      } else {
+        const nextTab = activeTab === "ambient" ? "player" : activeTab;
+        openMusicWidgetWithTab(nextTab, musicToggleBtn);
       }
     });
   }
+
+  if (soundboardToggleBtn && musicWidget) {
+    soundboardToggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isActive = musicWidget.classList.contains("active");
+      const activeTabBtn = document.querySelector(".music-tab-btn.active");
+      const activeTab = activeTabBtn ? activeTabBtn.getAttribute("data-music-tab") : "player";
+
+      if (isActive && activeTab === "ambient") {
+        closeMusicWidget();
+      } else {
+        openMusicWidgetWithTab("ambient", soundboardToggleBtn);
+      }
+    });
+  }
+
+  // Close when clicking outside
+  document.addEventListener("click", (e) => {
+    // If the clicked element is no longer in the DOM (e.g. removed during library re-render),
+    // we assume it was inside the widget and do not close it.
+    if (!document.body.contains(e.target)) return;
+
+    if (musicWidget && musicWidget.classList.contains("active") && 
+        !musicWidget.contains(e.target) && 
+        e.target !== musicToggleBtn && 
+        (!musicToggleBtn || !musicToggleBtn.contains(e.target)) && 
+        e.target !== soundboardToggleBtn && 
+        (!soundboardToggleBtn || !soundboardToggleBtn.contains(e.target))) {
+      
+      const trackModal = document.getElementById("modal-add-track");
+      if (trackModal && trackModal.classList.contains("active")) return;
+      const confirmModal = document.getElementById("modal-custom-confirm");
+      if (confirmModal && confirmModal.classList.contains("active")) return;
+
+      closeMusicWidget();
+    }
+  });
 
   // Set Player Initial Volume
   if (globalPlayer) {
