@@ -2145,3 +2145,60 @@ body {
 .toast-info {
   border-left: 4px solid #3b82f6;
 }
+
+/* About Developer Link Buttons styling */
+.developer-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.9rem 1.25rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.developer-link-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
+}
+
+.link-btn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.link-btn-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.link-btn-value {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.link-btn-arrow {
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.developer-link-btn:hover .link-btn-arrow {
+  color: var(--text-primary);
+  opacity: 0.9;
+  transform: translate(2px, -2px);
+}
