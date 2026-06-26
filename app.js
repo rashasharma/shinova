@@ -168,10 +168,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const homeUserEl = document.getElementById("home-username");
   if (homeUserEl) homeUserEl.innerText = appState.user.username;
 
-  // Set random quote in top bar
-  const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
-  setElementText("top-quote-text", `"${quote.text}"`);
-
   initNavigation();
   renderHomeSubjects();
   initPlanner();
@@ -1098,10 +1094,6 @@ function openFocusSession(subjectId) {
   countdownRemaining = countdownDuration;
 
   setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
-  
-  // Set random quote in header
-  const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
-  setElementText("top-quote-text", `"${quote.text}"`);
 
   // Switch view to Focus Space
   switchTab("focus");
@@ -1357,10 +1349,6 @@ function exitFocusSession() {
 
   activeSubjectId = null;
 
-  // Restore random header quote
-  const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
-  setElementText("top-quote-text", `"${quote.text}"`);
-
   // Switch view to Home Space
   switchTab("home");
 }
@@ -1607,6 +1595,23 @@ function initModals() {
         const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
         renderTodoList(activeFilter);
       }
+    });
+  }
+
+  // About Developer Modal open/close listeners
+  const btnAbout = document.getElementById("btn-about");
+  const modalAbout = document.getElementById("modal-about");
+  const btnCloseAboutModal = document.getElementById("btn-close-about-modal");
+
+  if (btnAbout && modalAbout) {
+    btnAbout.addEventListener("click", () => {
+      modalAbout.classList.add("active");
+    });
+  }
+
+  if (btnCloseAboutModal && modalAbout) {
+    btnCloseAboutModal.addEventListener("click", () => {
+      modalAbout.classList.remove("active");
     });
   }
 }
