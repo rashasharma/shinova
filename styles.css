@@ -1986,6 +1986,26 @@ body {
   flex-grow: 1;
 }
 
+.subject-dropdown-item-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 2px;
+}
+
+.subject-dropdown-item-edit:hover {
+  color: var(--primary);
+  background: rgba(139, 92, 246, 0.15);
+}
+
 .subject-dropdown-item-delete {
   display: flex;
   align-items: center;

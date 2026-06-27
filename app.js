@@ -94,6 +94,7 @@ let appState = {
 // Focus Session Engine State
 // ==========================================
 let activeSubjectId = null;
+let editingSubjectId = null;
 let timerRunning = false;
 let elapsedSeconds = 0;
 let sessionStart = null;
@@ -1170,6 +1171,19 @@ function renderSubjectDropdown() {
       }
     });
 
+    const editBtn = document.createElement("button");
+    editBtn.className = "subject-dropdown-item-edit";
+    editBtn.setAttribute("title", "Edit Subject");
+    editBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    `;
+
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdown.style.display = "none";
+      openEditSubjectModal(sub.id);
+    });
+
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "subject-dropdown-item-delete";
     deleteBtn.setAttribute("title", "Delete Subject");
@@ -1185,6 +1199,7 @@ function renderSubjectDropdown() {
     });
 
     row.appendChild(selectBtn);
+    row.appendChild(editBtn);
     row.appendChild(deleteBtn);
     dropdown.appendChild(row);
   });
@@ -1205,12 +1220,53 @@ function renderSubjectDropdown() {
     e.stopPropagation();
     dropdown.style.display = "none";
     
+    editingSubjectId = null;
+    setElementText("subject-modal-title", "Add New Subject");
+    const submitBtn = document.querySelector("#subject-form button[type='submit']");
+    if (submitBtn) submitBtn.innerText = "Create Subject";
+
+    // Reset color dots and custom color input to default
+    document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
+    const firstDot = document.querySelector("#modal-subject .color-dot");
+    if (firstDot) firstDot.classList.add("active");
+    const customColorInput = document.getElementById("custom-subject-color");
+    if (customColorInput) customColorInput.value = "#8b5cf6";
+
     // Open add subject modal
     const nameInput = document.getElementById("subject-name");
     if (nameInput) nameInput.value = "";
     document.getElementById("modal-subject").classList.add("active");
   });
   dropdown.appendChild(addBtn);
+}
+
+function openEditSubjectModal(subjectId) {
+  editingSubjectId = subjectId;
+  const sub = appState.subjects.find(s => s.id === subjectId);
+  if (!sub) return;
+
+  const nameInput = document.getElementById("subject-name");
+  if (nameInput) nameInput.value = sub.name;
+
+  // Select correct color dot or populate custom color picker
+  document.querySelectorAll("#modal-subject .color-dot").forEach(d => {
+    if (d.getAttribute("data-color") === sub.color) {
+      d.classList.add("active");
+    } else {
+      d.classList.remove("active");
+    }
+  });
+
+  const customColorInput = document.getElementById("custom-subject-color");
+  if (customColorInput) customColorInput.value = sub.color;
+
+  // Update modal title and button text
+  setElementText("subject-modal-title", "Edit Subject");
+  const submitBtn = document.querySelector("#subject-form button[type='submit']");
+  if (submitBtn) submitBtn.innerText = "Save Changes";
+
+  const modalSub = document.getElementById("modal-subject");
+  if (modalSub) modalSub.classList.add("active");
 }
 
 function startTimer() {
@@ -1375,6 +1431,24 @@ function updateStreak() {
   }
 }
 
+function updateActiveSubjectBadge() {
+  if (!activeSubjectId) return;
+  const sub = appState.subjects.find(s => s.id === activeSubjectId);
+  if (!sub) return;
+
+  setElementText("focus-subject-name", sub.name);
+  const focusDot = document.getElementById("focus-subject-dot");
+  if (focusDot) {
+    focusDot.style.color = sub.color;
+    focusDot.style.backgroundColor = sub.color;
+  }
+
+  const focusBadge = document.getElementById("focus-subject-badge");
+  if (focusBadge) {
+    focusBadge.style.setProperty("--subj-theme-color", sub.color);
+  }
+}
+
 // ==========================================
 // Ambient Audio Manager
 // ==========================================
@@ -1498,28 +1572,62 @@ function initModals() {
       const nameInput = document.getElementById("subject-name");
       const name = nameInput ? nameInput.value.trim() : "";
       
-      const activeColorDot = document.querySelector(".color-dot.active");
+      const activeColorDot = document.querySelector("#modal-subject .color-dot.active");
       const customColorInput = document.getElementById("custom-subject-color");
       const color = activeColorDot ? activeColorDot.getAttribute("data-color") : (customColorInput ? customColorInput.value : "#8b5cf6");
 
       if (name) {
-        const newSub = {
-          id: `sub-${Date.now()}`,
-          name: name,
-          color: color,
-          totalTime: 0
-        };
-        
-        appState.subjects.push(newSub);
-        localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
+        if (editingSubjectId) {
+          // Edit Mode
+          const subIndex = appState.subjects.findIndex(s => s.id === editingSubjectId);
+          if (subIndex !== -1) {
+            appState.subjects[subIndex].name = name;
+            appState.subjects[subIndex].color = color;
+            localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
+            
+            // If it is the active subject, update the focus badge
+            if (activeSubjectId === editingSubjectId) {
+              updateActiveSubjectBadge();
+            }
+
+            // Sync Weekly Chart / Subject Chart colors and names if Insights are initialized
+            if (window.Chart && typeof updateChartsThemes === "function") {
+              updateChartsThemes();
+            }
+
+            renderSubjectDropdown();
+            
+            // Get active filter for todo list
+            const activeFilterBtn = document.querySelector(".filter-btn.active");
+            const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
+            renderTodoList(activeFilter);
+            
+            showToast("Subject updated successfully!", "success");
+          }
+          editingSubjectId = null;
+        } else {
+          // Create Mode
+          const newSub = {
+            id: `sub-${Date.now()}`,
+            name: name,
+            color: color,
+            totalTime: 0
+          };
+          
+          appState.subjects.push(newSub);
+          localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
+          
+          // If in focus view, switch to the new subject immediately
+          const focusView = document.getElementById("view-focus");
+          if (focusView && focusView.classList.contains("active")) {
+            changeActiveSubject(newSub.id);
+          } else {
+            renderSubjectDropdown();
+          }
+          showToast("Subject created successfully!", "success");
+        }
         
         document.getElementById("modal-subject").classList.remove("active");
-        
-        // If in focus view, switch to the new subject immediately
-        const focusView = document.getElementById("view-focus");
-        if (focusView && focusView.classList.contains("active")) {
-          changeActiveSubject(newSub.id);
-        }
       }
     });
   }
