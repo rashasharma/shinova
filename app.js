@@ -157,11 +157,202 @@ function setElementText(id, text) {
   if (el) el.innerText = text;
 }
 
+function saveActiveSessionState() {
+  if (!activeSubjectId) {
+    clearActiveSessionState();
+    return;
+  }
+  const sessionState = {
+    activeSubjectId: activeSubjectId,
+    sessionStart: sessionStart,
+    elapsedSeconds: elapsedSeconds,
+    timerRunning: timerRunning,
+    isResting: isResting,
+    restSeconds: restSeconds,
+    currentMode: currentMode,
+    countdownDuration: countdownDuration,
+    countdownRemaining: countdownRemaining,
+    lastTick: Date.now()
+  };
+  localStorage.setItem("ypt_active_session", JSON.stringify(sessionState));
+}
+
+function clearActiveSessionState() {
+  localStorage.removeItem("ypt_active_session");
+}
+
+function checkAndRecoverSession() {
+  const savedData = localStorage.getItem("ypt_active_session");
+  if (!savedData) return;
+
+  try {
+    const saved = JSON.parse(savedData);
+    if (!saved || !saved.activeSubjectId) {
+      clearActiveSessionState();
+      return;
+    }
+
+    const sub = appState.subjects.find(s => s.id === saved.activeSubjectId);
+    if (!sub) {
+      clearActiveSessionState();
+      return;
+    }
+
+    const offlineSeconds = Math.floor((Date.now() - saved.lastTick) / 1000);
+
+    // Case A: User away for > 5 minutes (300 seconds)
+    if (offlineSeconds > 300) {
+      const focusTime = saved.currentMode === "stopwatch" ? saved.elapsedSeconds : (saved.countdownDuration - saved.countdownRemaining);
+      if (focusTime >= 5) {
+        const newLog = {
+          id: `log-${Date.now()}`,
+          subjectId: saved.activeSubjectId,
+          startTime: saved.sessionStart || new Date().toISOString(),
+          duration: focusTime
+        };
+        appState.logs.push(newLog);
+        localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+        updateTodayTimesFromLogs();
+        updateStreak();
+        showToast(`Auto-saved previous session: ${formatDurationHM(focusTime)}`, "info");
+      }
+      clearActiveSessionState();
+      return;
+    }
+
+    // Case B: User refreshed or had a quick interruption (<= 5 minutes)
+    activeSubjectId = saved.activeSubjectId;
+    sessionStart = saved.sessionStart;
+    currentMode = saved.currentMode;
+    countdownDuration = saved.countdownDuration;
+    countdownRemaining = saved.countdownRemaining;
+    isResting = saved.isResting;
+    restSeconds = saved.restSeconds;
+    elapsedSeconds = saved.elapsedSeconds;
+    
+    // Add offline time to the ticking timer
+    if (saved.timerRunning) {
+      if (isResting) {
+        restSeconds += offlineSeconds;
+      } else {
+        if (currentMode === "stopwatch") {
+          elapsedSeconds += offlineSeconds;
+        } else {
+          // If countdown timer completed while offline, transition to rest
+          if (countdownRemaining - offlineSeconds <= 0) {
+            const focusTime = countdownRemaining; // study duration completed
+            if (focusTime >= 5) {
+              const newLog = {
+                id: `log-${Date.now()}`,
+                subjectId: activeSubjectId,
+                startTime: sessionStart || new Date().toISOString(),
+                duration: focusTime
+              };
+              appState.logs.push(newLog);
+              localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+              updateTodayTimesFromLogs();
+              updateStreak();
+            }
+            isResting = true;
+            restSeconds = offlineSeconds - countdownRemaining;
+            countdownRemaining = countdownDuration;
+          } else {
+            countdownRemaining -= offlineSeconds;
+          }
+        }
+      }
+    }
+
+    // Restore UI view to Focus Screen
+    switchTab("focus");
+
+    // Restore Focus Badge metadata
+    setElementText("focus-subject-name", sub.name);
+    const focusDot = document.getElementById("focus-subject-dot");
+    if (focusDot) {
+      focusDot.style.color = sub.color;
+      focusDot.style.backgroundColor = sub.color;
+    }
+    const focusBadge = document.getElementById("focus-subject-badge");
+    if (focusBadge) {
+      focusBadge.style.setProperty("--subj-theme-color", sub.color);
+    }
+    setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
+    updateFocusClockDisplay();
+
+    // Re-ticking behavior
+    if (saved.timerRunning) {
+      const focusView = document.getElementById("view-focus");
+      if (isResting) {
+        timerRunning = false;
+        if (focusView) {
+          focusView.classList.remove("focusing-active");
+          focusView.classList.add("resting-active");
+        }
+        setElementText("focus-status-text", "RESTING");
+        const coffee = document.getElementById("rest-icon-coffee");
+        const study = document.getElementById("rest-icon-study");
+        if (coffee) coffee.classList.add("hidden");
+        if (study) study.classList.remove("hidden");
+        setElementText("rest-btn-text", "Study");
+        
+        clearInterval(restInterval);
+        restInterval = setInterval(() => {
+          restSeconds++;
+          updateFocusClockDisplay();
+          document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+          saveActiveSessionState();
+        }, 1000);
+      } else {
+        timerRunning = true;
+        if (focusView) {
+          focusView.classList.remove("resting-active");
+          focusView.classList.add("focusing-active");
+        }
+        setElementText("focus-status-text", "FOCUSING");
+        
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+          if (currentMode === "stopwatch") {
+            elapsedSeconds++;
+            updateFocusClockDisplay();
+            document.title = `Focusing: ${formatDurationHMS(elapsedSeconds)} | Shinova`;
+          } else {
+            countdownRemaining--;
+            updateFocusClockDisplay();
+            document.title = `Focusing: ${formatDurationHMS(countdownRemaining)} | Shinova`;
+            if (countdownRemaining <= 0) {
+              clearInterval(timerInterval);
+              timerRunning = false;
+              showToast("Focus block completed! Time for a rest.", "success");
+              startRest();
+            }
+          }
+          saveActiveSessionState();
+        }, 1000);
+      }
+      showToast("Session recovered!", "success");
+    } else {
+      timerRunning = false;
+      const focusView = document.getElementById("view-focus");
+      if (focusView) {
+        focusView.classList.remove("focusing-active", "resting-active");
+      }
+      setElementText("focus-status-text", "PAUSED");
+      updateFocusClockDisplay();
+    }
+  } catch (err) {
+    console.error("Failed to recover active session state:", err);
+    clearActiveSessionState();
+  }
+}
+
 // ==========================================
 // App Initialization
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
   initData();
+  checkAndRecoverSession();
   startLocalClock();
   applyTheme(appState.user.theme);
   
@@ -1014,6 +1205,7 @@ function initFocusMode() {
         setElementText("focus-mode-name", "Stopwatch");
         setElementText("focus-clock-display", formatDurationHMS(elapsedSeconds));
       }
+      saveActiveSessionState();
     });
   }
 
@@ -1108,6 +1300,7 @@ function openFocusSession(subjectId) {
   }
   setElementText("focus-status-text", "PAUSED");
   updateFocusClockDisplay();
+  saveActiveSessionState();
 }
 
 function changeActiveSubject(newSubjectId) {
@@ -1307,7 +1500,9 @@ function startTimer() {
         startRest();
       }
     }
+    saveActiveSessionState();
   }, 1000);
+  saveActiveSessionState();
 }
 
 function pauseTimer() {
@@ -1320,6 +1515,7 @@ function pauseTimer() {
     focusView.classList.remove("focusing-active");
   }
   document.title = "Paused | Shinova";
+  saveActiveSessionState();
 }
 
 function startRest() {
@@ -1347,7 +1543,9 @@ function startRest() {
     restSeconds++;
     updateFocusClockDisplay();
     document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+    saveActiveSessionState();
   }, 1000);
+  saveActiveSessionState();
 }
 
 function endRest() {
@@ -1364,6 +1562,7 @@ function endRest() {
   if (focusView) {
     focusView.classList.remove("resting-active");
   }
+  saveActiveSessionState();
 }
 
 function updateFocusClockDisplay() {
@@ -1404,6 +1603,7 @@ function exitFocusSession() {
   }
 
   activeSubjectId = null;
+  clearActiveSessionState();
 
   // Switch view to Home Space
   switchTab("home");
