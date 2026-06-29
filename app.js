@@ -59,7 +59,11 @@ const WALLPAPERS = [
   { id: "tropical-1", name: "Tropical 1", url: "backgrounds/Tropical (1).jpg" },
   { id: "tropical-2", name: "Tropical 2", url: "backgrounds/Tropical (2).jpg" },
   { id: "tropical-3", name: "Tropical 3", url: "backgrounds/Tropical (3).jpg" },
-  { id: "tropical-4", name: "Tropical 4", url: "backgrounds/Tropical (4).jpg" }
+  { id: "tropical-4", name: "Tropical 4", url: "backgrounds/Tropical (4).jpg" },
+  { id: "winter-1", name: "Winter 1", url: "backgrounds/Winters (1).jpg" },
+  { id: "winter-2", name: "Winter 2", url: "backgrounds/Winters (2).jpg" },
+  { id: "winter-3", name: "Winter 3", url: "backgrounds/Winters (3).jpg" },
+  { id: "winter-4", name: "Winter 4", url: "backgrounds/Winters (4).jpg" }
 ];
 
 const DEFAULT_MUSIC_TRACKS = [
