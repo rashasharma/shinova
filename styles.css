@@ -2266,3 +2266,178 @@ body {
 .hue-slider::-moz-range-thumb:hover {
   transform: scale(1.2);
 }
+
+/* 3D Flip Clock Styles */
+.clock-display-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-clock-style-toggle {
+  opacity: 0.5;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn-clock-style-toggle:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  transform: rotate(45deg);
+}
+
+.flip-clock-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.flip-digit-wrapper {
+  position: relative;
+  width: 100px;
+  height: 150px;
+  perspective: 300px;
+  border-radius: 12px;
+  background: rgba(15, 17, 28, 0.7);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 7.2rem;
+  color: #fff;
+  overflow: hidden;
+}
+
+/* Horizontal split line across the center */
+.flip-digit-wrapper::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 0.75px);
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+#focus-flip-clock .flip-digit-wrapper {
+  width: 80px;
+  height: 120px;
+  border-radius: 10px;
+  font-size: 5.5rem;
+}
+
+.flip-digit-card {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.digit-half {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(22, 22, 37, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.top-half, .top-flip {
+  clip-path: inset(0 0 50% 0);
+  border-radius: 12px;
+  background: linear-gradient(to bottom, rgba(28, 28, 48, 0.95), rgba(20, 20, 32, 0.98));
+}
+
+#focus-flip-clock .top-half, #focus-flip-clock .top-flip {
+  border-radius: 10px;
+}
+
+.bottom-half, .bottom-flip {
+  clip-path: inset(50% 0 0 0);
+  border-radius: 12px;
+  background: linear-gradient(to bottom, rgba(18, 18, 28, 0.98), rgba(14, 14, 22, 0.99));
+}
+
+#focus-flip-clock .bottom-half, #focus-flip-clock .bottom-flip {
+  border-radius: 10px;
+}
+
+/* 3D transitions around the middle hinge */
+.top-flip {
+  transform-origin: 50% 50%;
+  animation: flip-top-anim 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  backface-visibility: hidden;
+  z-index: 5;
+}
+
+.bottom-flip {
+  transform-origin: 50% 50%;
+  transform: rotateX(90deg);
+  animation: flip-bottom-anim 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+  backface-visibility: hidden;
+  z-index: 4;
+}
+
+.flip-colon {
+  font-size: 7rem;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0.8;
+  margin: 0 4px;
+  animation: pulse-colon 1s infinite;
+}
+
+#focus-flip-clock .flip-colon {
+  font-size: 5rem;
+}
+
+@keyframes flip-top-anim {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-90deg); }
+}
+
+@keyframes flip-bottom-anim {
+  0% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+@keyframes pulse-colon {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.85; }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .flip-digit-wrapper {
+    width: 65px;
+    height: 95px;
+    border-radius: 8px;
+    font-size: 4.2rem;
+  }
+  
+  #focus-flip-clock .flip-digit-wrapper {
+    width: 45px;
+    height: 65px;
+    border-radius: 6px;
+    font-size: 2.8rem;
+  }
+  
+  .flip-colon {
+    font-size: 4.2rem;
+    margin: 0 2px;
+  }
+  
+  #focus-flip-clock .flip-colon {
+    font-size: 2.8rem;
+    margin: 0 2px;
+  }
+}
