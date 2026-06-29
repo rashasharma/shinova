@@ -516,9 +516,12 @@
             <div class="color-dot" style="background-color: #22d3ee;" data-color="#22d3ee"></div>
             <div class="color-dot" style="background-color: #a3e635;" data-color="#a3e635"></div>
           </div>
-          <div class="custom-color-input-wrapper" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.50rem;">
-            <label for="custom-subject-color" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin: 0;">Or choose custom color:</label>
-            <input type="color" id="custom-subject-color" class="custom-color-picker" value="#8b5cf6" style="border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; background: none; padding: 0;">
+          <div class="custom-color-input-wrapper" style="margin-top: 1.25rem;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.5rem;">Or choose custom color:</label>
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+              <input type="range" id="custom-subject-hue" min="0" max="360" value="270" class="hue-slider" style="flex-grow: 1;">
+              <div id="custom-color-preview" style="width: 28px; height: 28px; border-radius: 50%; background-color: hsl(270, 70%, 60%); box-shadow: 0 0 10px hsl(270, 70%, 60%); flex-shrink: 0; border: 2px solid rgba(255,255,255,0.2);"></div>
+            </div>
           </div>
         </div>
         <div class="modal-actions">
