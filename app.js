@@ -21,6 +21,8 @@ const WALLPAPERS = [
   { id: "beach-1", name: "Beach 1", url: "backgrounds/Beach (1).jpg" },
   { id: "beach-2", name: "Beach 2", url: "backgrounds/Beach (2).jpg" },
   { id: "beach-3", name: "Beach 3", url: "backgrounds/Beach (3).jpg" },
+  { id: "beach-4", name: "Beach 4", url: "backgrounds/Beach (4).jpg" },
+  { id: "beach-5", name: "Beach 5", url: "backgrounds/Beach (5).jpg" },
   { id: "cafe-1", name: "Cafe 1", url: "backgrounds/Cafe.jpg" },
   { id: "cafe-2", name: "Cafe 2", url: "backgrounds/Cafe 2.jpg" },
   { id: "cafe-3", name: "Cafe 3", url: "backgrounds/Cafe 3.jpg" },
@@ -53,7 +55,11 @@ const WALLPAPERS = [
   { id: "rain-2", name: "Rain 2", url: "backgrounds/Rain 2.jpg" },
   { id: "rain-3", name: "Rain 3", url: "backgrounds/Rain 3.jpg" },
   { id: "snow-mountain-1", name: "Snow Mountain 1", url: "backgrounds/Snow Mountain (1).jpg" },
-  { id: "snow-mountain-2", name: "Snow Mountain 2", url: "backgrounds/Snow Mountain (2).jpg" }
+  { id: "snow-mountain-2", name: "Snow Mountain 2", url: "backgrounds/Snow Mountain (2).jpg" },
+  { id: "tropical-1", name: "Tropical 1", url: "backgrounds/Tropical (1).jpg" },
+  { id: "tropical-2", name: "Tropical 2", url: "backgrounds/Tropical (2).jpg" },
+  { id: "tropical-3", name: "Tropical 3", url: "backgrounds/Tropical (3).jpg" },
+  { id: "tropical-4", name: "Tropical 4", url: "backgrounds/Tropical (4).jpg" }
 ];
 
 const DEFAULT_MUSIC_TRACKS = [
