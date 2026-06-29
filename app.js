@@ -302,6 +302,78 @@ function tryPlayAllActiveAmbientSounds() {
   }
 }
 
+function updateFlipDigit(wrapperId, newDigit) {
+  const wrapper = document.getElementById(wrapperId);
+  if (!wrapper) return;
+
+  const currentDigit = wrapper.getAttribute("data-digit") || "0";
+  if (currentDigit === newDigit && wrapper.innerHTML.trim() !== "") return;
+
+  wrapper.setAttribute("data-digit", newDigit);
+
+  wrapper.innerHTML = `
+    <div class="flip-digit-card">
+      <div class="digit-half top-half"><span>${newDigit}</span></div>
+      <div class="digit-half bottom-half"><span>${currentDigit}</span></div>
+      <div class="digit-half top-flip"><span>${currentDigit}</span></div>
+      <div class="digit-half bottom-flip"><span>${newDigit}</span></div>
+    </div>
+  `;
+}
+
+function applyClockStyle(style) {
+  const homeTextClock = document.getElementById("local-clock-display");
+  const homeFlipClock = document.getElementById("local-flip-clock");
+  const focusTextClock = document.getElementById("focus-clock-display");
+  const focusFlipClock = document.getElementById("focus-flip-clock");
+
+  const isFlip = style === "flip";
+
+  if (homeTextClock) {
+    if (isFlip) homeTextClock.classList.add("hidden");
+    else homeTextClock.classList.remove("hidden");
+  }
+  if (homeFlipClock) {
+    if (isFlip) homeFlipClock.classList.remove("hidden");
+    else homeFlipClock.classList.add("hidden");
+  }
+
+  if (focusTextClock) {
+    if (isFlip) focusTextClock.classList.add("hidden");
+    else focusTextClock.classList.remove("hidden");
+  }
+  if (focusFlipClock) {
+    if (isFlip) focusFlipClock.classList.remove("hidden");
+    else focusFlipClock.classList.add("hidden");
+  }
+
+  // Force tick to sync values immediately
+  const now = new Date();
+  const hrs = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  
+  if (isFlip) {
+    // Clear data-digit to force transition redraw on style change
+    document.querySelectorAll(".flip-digit-wrapper").forEach(el => el.removeAttribute("data-digit"));
+    
+    updateFlipDigit("home-fd-h1", hrs[0]);
+    updateFlipDigit("home-fd-h2", hrs[1]);
+    updateFlipDigit("home-fd-m1", mins[0]);
+    updateFlipDigit("home-fd-m2", mins[1]);
+  }
+  updateFocusClockDisplay();
+}
+
+function toggleClockStyle() {
+  const currentStyle = appState.user.clockStyle || "digital";
+  const newStyle = currentStyle === "digital" ? "flip" : "digital";
+  
+  appState.user.clockStyle = newStyle;
+  localStorage.setItem("ypt_user", JSON.stringify(appState.user));
+  
+  applyClockStyle(newStyle);
+}
+
 function checkAndRecoverSession() {
   const savedData = localStorage.getItem("ypt_active_session");
   if (!savedData) return;
@@ -477,6 +549,12 @@ document.addEventListener("DOMContentLoaded", () => {
   checkAndRecoverSession();
   startLocalClock();
   applyTheme(appState.user.theme);
+
+  // Set clock style from user preferences
+  if (!appState.user.clockStyle) {
+    appState.user.clockStyle = "digital";
+  }
+  applyClockStyle(appState.user.clockStyle);
   
   // Set initial greeting
   const homeUserEl = document.getElementById("home-username");
@@ -645,6 +723,13 @@ function startLocalClock() {
     const hrs = String(now.getHours()).padStart(2, '0');
     const mins = String(now.getMinutes()).padStart(2, '0');
     setElementText("local-clock-display", `${hrs}:${mins}`);
+
+    if (appState.user.clockStyle === "flip") {
+      updateFlipDigit("home-fd-h1", hrs[0]);
+      updateFlipDigit("home-fd-h2", hrs[1]);
+      updateFlipDigit("home-fd-m1", mins[0]);
+      updateFlipDigit("home-fd-m2", mins[1]);
+    }
   }
   tick();
   setInterval(tick, 1000);
@@ -1303,6 +1388,7 @@ function populateSettings() {
 // ==========================================
 function initFocusMode() {
   const focusClockDisplay = document.getElementById("focus-clock-display");
+  const focusFlipClock = document.getElementById("focus-flip-clock");
   const btnRest = document.getElementById("btn-focus-rest");
   const btnExit = document.getElementById("btn-exit-focus");
   const btnModeToggle = document.getElementById("btn-focus-mode-toggle");
@@ -1315,6 +1401,33 @@ function initFocusMode() {
       } else {
         startTimer();
       }
+    });
+  }
+
+  if (focusFlipClock) {
+    focusFlipClock.addEventListener("click", () => {
+      if (timerRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    });
+  }
+
+  // Bind style togglers
+  const btnToggleHome = document.getElementById("btn-toggle-home-clock");
+  if (btnToggleHome) {
+    btnToggleHome.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleClockStyle();
+    });
+  }
+
+  const btnToggleFocus = document.getElementById("btn-toggle-focus-clock");
+  if (btnToggleFocus) {
+    btnToggleFocus.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleClockStyle();
     });
   }
 
@@ -1775,12 +1888,28 @@ function updateFocusClockDisplay() {
   const display = document.getElementById("focus-clock-display");
   if (!display) return;
 
+  let totalSeconds = 0;
   if (isResting) {
-    display.innerText = formatDurationHMS(restSeconds);
+    totalSeconds = restSeconds;
   } else if (currentMode === "stopwatch") {
-    display.innerText = formatDurationHMS(elapsedSeconds);
+    totalSeconds = elapsedSeconds;
   } else {
-    display.innerText = formatDurationHMS(countdownRemaining);
+    totalSeconds = countdownRemaining;
+  }
+
+  display.innerText = formatDurationHMS(totalSeconds);
+
+  if (appState.user.clockStyle === "flip") {
+    const hrs = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+    const secs = String(totalSeconds % 60).padStart(2, '0');
+
+    updateFlipDigit("focus-fd-h1", hrs[0]);
+    updateFlipDigit("focus-fd-h2", hrs[1]);
+    updateFlipDigit("focus-fd-m1", mins[0]);
+    updateFlipDigit("focus-fd-m2", mins[1]);
+    updateFlipDigit("focus-fd-s1", secs[0]);
+    updateFlipDigit("focus-fd-s2", secs[1]);
   }
 }
 
