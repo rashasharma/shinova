@@ -157,6 +157,34 @@ function setElementText(id, text) {
   if (el) el.innerText = text;
 }
 
+function getHueFromColor(colorStr) {
+  if (!colorStr) return 270;
+  if (colorStr.startsWith("hsl")) {
+    const match = colorStr.match(/hsl\((\d+)/);
+    return match ? parseInt(match[1]) : 270;
+  }
+  if (colorStr.startsWith("#")) {
+    let r = parseInt(colorStr.slice(1, 3), 16) / 255;
+    let g = parseInt(colorStr.slice(3, 5), 16) / 255;
+    let b = parseInt(colorStr.slice(5, 7), 16) / 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h;
+    if (max === min) {
+      h = 0;
+    } else {
+      let d = max - min;
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return Math.round(h * 360);
+  }
+  return 270;
+}
+
 function saveActiveSessionState() {
   if (!activeSubjectId) {
     clearActiveSessionState();
@@ -179,6 +207,92 @@ function saveActiveSessionState() {
 
 function clearActiveSessionState() {
   localStorage.removeItem("ypt_active_session");
+}
+
+function saveAmbientSoundsState() {
+  const activeSounds = {};
+  document.querySelectorAll(".sound-item").forEach(item => {
+    if (item.classList.contains("active")) {
+      const soundKey = item.getAttribute("data-sound");
+      const volumeSlider = item.querySelector(".sound-volume");
+      activeSounds[soundKey] = volumeSlider ? parseFloat(volumeSlider.value) : 50;
+    }
+  });
+  localStorage.setItem("ypt_active_ambient_sounds", JSON.stringify(activeSounds));
+}
+
+function initAmbientSoundsFromStorage() {
+  const savedData = localStorage.getItem("ypt_active_ambient_sounds");
+  if (!savedData) return;
+  try {
+    const activeSounds = JSON.parse(savedData);
+    Object.keys(activeSounds).forEach(soundKey => {
+      const vol = activeSounds[soundKey];
+      const item = document.querySelector(`.sound-item[data-sound="${soundKey}"]`);
+      if (item) {
+        item.classList.add("active");
+        const toggleBtn = item.querySelector(".sound-toggle-btn");
+        const playIcon = toggleBtn.querySelector(".icon-play-sound");
+        const pauseIcon = toggleBtn.querySelector(".icon-pause-sound");
+        if (playIcon) playIcon.classList.add("hidden");
+        if (pauseIcon) pauseIcon.classList.remove("hidden");
+        
+        const volumeSlider = item.querySelector(".sound-volume");
+        if (volumeSlider) volumeSlider.value = vol;
+
+        // Try playing
+        const audioEl = document.getElementById(`audio-${soundKey}`);
+        if (audioEl) {
+          audioEl.volume = vol / 100;
+          audioEl.play().catch(err => {
+            // Autoplay blocked, will recover on interaction
+          });
+        }
+      }
+    });
+  } catch (err) {
+    console.error("Failed to restore ambient sounds:", err);
+  }
+}
+
+let ambientSoundsInitialized = false;
+function tryPlayAllActiveAmbientSounds() {
+  if (ambientSoundsInitialized) return;
+  const savedData = localStorage.getItem("ypt_active_ambient_sounds");
+  if (!savedData) {
+    ambientSoundsInitialized = true;
+    return;
+  }
+  try {
+    const activeSounds = JSON.parse(savedData);
+    let successfullyPlayed = 0;
+    const soundKeys = Object.keys(activeSounds);
+    const totalSounds = soundKeys.length;
+    if (totalSounds === 0) {
+      ambientSoundsInitialized = true;
+      return;
+    }
+
+    soundKeys.forEach(soundKey => {
+      const vol = activeSounds[soundKey];
+      const audioEl = document.getElementById(`audio-${soundKey}`);
+      if (audioEl) {
+        audioEl.volume = vol / 100;
+        audioEl.play()
+          .then(() => {
+            successfullyPlayed++;
+            if (successfullyPlayed === totalSounds) {
+              ambientSoundsInitialized = true;
+            }
+          })
+          .catch(err => {
+            // Autoplay blocked, wait for next user action
+          });
+      }
+    });
+  } catch (err) {
+    console.error("Autoplay unblock error:", err);
+  }
 }
 
 function checkAndRecoverSession() {
@@ -352,6 +466,7 @@ function checkAndRecoverSession() {
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
   initData();
+  initAmbientSoundsFromStorage();
   checkAndRecoverSession();
   startLocalClock();
   applyTheme(appState.user.theme);
@@ -385,6 +500,11 @@ document.addEventListener("DOMContentLoaded", () => {
       onboardingModal.classList.add("active");
     }
   }
+
+  // Unblock autoplay for active ambient sounds on first interaction
+  ["click", "keydown", "touchstart"].forEach(evtName => {
+    document.addEventListener(evtName, tryPlayAllActiveAmbientSounds);
+  });
 });
 
 // Load state from local storage or pre-populate defaults
@@ -1231,10 +1351,12 @@ function initFocusMode() {
         pauseIcon.classList.add("hidden");
         stopAmbientSound(soundKey);
       }
+      saveAmbientSoundsState();
     });
 
     volumeSlider.addEventListener("input", (e) => {
       setAmbientVolume(soundKey, e.target.value / 100);
+      saveAmbientSoundsState();
     });
   });
 
@@ -1418,12 +1540,17 @@ function renderSubjectDropdown() {
     const submitBtn = document.querySelector("#subject-form button[type='submit']");
     if (submitBtn) submitBtn.innerText = "Create Subject";
 
-    // Reset color dots and custom color input to default
+    // Reset color dots and custom hue slider to default
     document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
     const firstDot = document.querySelector("#modal-subject .color-dot");
     if (firstDot) firstDot.classList.add("active");
-    const customColorInput = document.getElementById("custom-subject-color");
-    if (customColorInput) customColorInput.value = "#8b5cf6";
+    const customHueSlider = document.getElementById("custom-subject-hue");
+    if (customHueSlider) customHueSlider.value = 270;
+    const customColorPreview = document.getElementById("custom-color-preview");
+    if (customColorPreview) {
+      customColorPreview.style.backgroundColor = "hsl(270, 70%, 60%)";
+      customColorPreview.style.boxShadow = "0 0 10px hsl(270, 70%, 60%)";
+    }
 
     // Open add subject modal
     const nameInput = document.getElementById("subject-name");
@@ -1450,8 +1577,16 @@ function openEditSubjectModal(subjectId) {
     }
   });
 
-  const customColorInput = document.getElementById("custom-subject-color");
-  if (customColorInput) customColorInput.value = sub.color;
+  const hue = getHueFromColor(sub.color);
+  const customHueSlider = document.getElementById("custom-subject-hue");
+  if (customHueSlider) customHueSlider.value = hue;
+
+  const customColorPreview = document.getElementById("custom-color-preview");
+  if (customColorPreview) {
+    const finalColor = sub.color.startsWith("hsl") ? sub.color : `hsl(${hue}, 70%, 60%)`;
+    customColorPreview.style.backgroundColor = finalColor;
+    customColorPreview.style.boxShadow = `0 0 10px ${finalColor}`;
+  }
 
   // Update modal title and button text
   setElementText("subject-modal-title", "Edit Subject");
@@ -1581,7 +1716,6 @@ function updateFocusClockDisplay() {
 function exitFocusSession() {
   pauseTimer();
   endRest();
-  stopAllAmbientSounds();
 
   document.title = "Shinova - Ambient Study Space & Planner";
 
@@ -1735,12 +1869,18 @@ function initModals() {
       const nameInput = document.getElementById("subject-name");
       if (nameInput) nameInput.value = "";
       
-      // Reset color dots and custom color input to default
-      document.querySelectorAll(".color-dot").forEach(d => d.classList.remove("active"));
-      const firstDot = document.querySelector(".color-dot");
+      // Reset color dots and custom hue slider to default
+      document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
+      const firstDot = document.querySelector("#modal-subject .color-dot");
       if (firstDot) firstDot.classList.add("active");
-      const customColorInput = document.getElementById("custom-subject-color");
-      if (customColorInput) customColorInput.value = "#8b5cf6";
+      
+      const customHueSlider = document.getElementById("custom-subject-hue");
+      if (customHueSlider) customHueSlider.value = 270;
+      const customColorPreview = document.getElementById("custom-color-preview");
+      if (customColorPreview) {
+        customColorPreview.style.backgroundColor = "hsl(270, 70%, 60%)";
+        customColorPreview.style.boxShadow = "0 0 10px hsl(270, 70%, 60%)";
+      }
 
       const modalSub = document.getElementById("modal-subject");
       if (modalSub) modalSub.classList.add("active");
@@ -1748,19 +1888,26 @@ function initModals() {
   }
 
   // Subject color dot selection
-  document.querySelectorAll(".color-dot").forEach(dot => {
+  document.querySelectorAll("#modal-subject .color-dot").forEach(dot => {
     dot.addEventListener("click", () => {
-      document.querySelectorAll(".color-dot").forEach(d => d.classList.remove("active"));
+      document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
       dot.classList.add("active");
     });
   });
 
-  // Custom Color Picker input
-  const customColorInput = document.getElementById("custom-subject-color");
-  if (customColorInput) {
-    customColorInput.addEventListener("input", () => {
+  // Custom Color Picker slider input
+  const customHueSlider = document.getElementById("custom-subject-hue");
+  const customColorPreview = document.getElementById("custom-color-preview");
+  if (customHueSlider) {
+    customHueSlider.addEventListener("input", (e) => {
+      const hue = e.target.value;
+      const HSLColor = `hsl(${hue}, 70%, 60%)`;
+      if (customColorPreview) {
+        customColorPreview.style.backgroundColor = HSLColor;
+        customColorPreview.style.boxShadow = `0 0 10px ${HSLColor}`;
+      }
       // Deselect preset dots when choosing a custom color
-      document.querySelectorAll(".color-dot").forEach(d => d.classList.remove("active"));
+      document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
     });
   }
 
@@ -1773,8 +1920,14 @@ function initModals() {
       const name = nameInput ? nameInput.value.trim() : "";
       
       const activeColorDot = document.querySelector("#modal-subject .color-dot.active");
-      const customColorInput = document.getElementById("custom-subject-color");
-      const color = activeColorDot ? activeColorDot.getAttribute("data-color") : (customColorInput ? customColorInput.value : "#8b5cf6");
+      let color;
+      if (activeColorDot) {
+        color = activeColorDot.getAttribute("data-color");
+      } else {
+        const hueSlider = document.getElementById("custom-subject-hue");
+        const hue = hueSlider ? hueSlider.value : 270;
+        color = `hsl(${hue}, 70%, 60%)`;
+      }
 
       if (name) {
         if (editingSubjectId) {
