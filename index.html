@@ -189,13 +189,19 @@
           <!-- Charts -->
           <div class="charts-grid">
             <div class="chart-card">
-              <h3>Weekly Focus Hours</h3>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+                <h3 id="chart-focus-title" style="margin: 0; font-size: 1.15rem;">Weekly Focus Hours</h3>
+                <div class="chart-filters" style="display: flex; gap: 0.4rem;">
+                  <button class="filter-btn active chart-toggle-btn" data-range="weekly">Week</button>
+                  <button class="filter-btn chart-toggle-btn" data-range="yearly">Year</button>
+                </div>
+              </div>
               <div class="chart-container">
                 <canvas id="weeklyHoursChart"></canvas>
               </div>
             </div>
             <div class="chart-card">
-              <h3>Subject Distribution</h3>
+              <h3 id="chart-dist-title" style="font-size: 1.15rem; margin-bottom: 1.25rem;">Weekly Distribution</h3>
               <div class="chart-container">
                 <canvas id="subjectDistributionChart"></canvas>
               </div>

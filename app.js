@@ -87,7 +87,8 @@ let appState = {
   customTracks: [],
   musicVolume: 70,
   libraryMode: "online",
-  onlineTracks: []
+  onlineTracks: [],
+  insightsRange: "weekly"
 };
 
 // ==========================================
@@ -945,7 +946,25 @@ function deleteTodo(todoId) {
 // Insights & Stats Logic
 // ==========================================
 function initInsights() {
-  // Empty constructor placeholder
+  // Set up range togglers
+  document.querySelectorAll(".chart-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const range = e.target.getAttribute("data-range");
+      appState.insightsRange = range;
+      
+      // Update UI active class
+      document.querySelectorAll(".chart-toggle-btn").forEach(b => {
+        if (b.getAttribute("data-range") === range) {
+          b.classList.add("active");
+        } else {
+          b.classList.remove("active");
+        }
+      });
+      
+      // Redraw charts
+      renderCharts();
+    });
+  });
 }
 
 function renderInsights() {
@@ -1019,20 +1038,55 @@ function renderCharts() {
   const textColor = isLight ? "#475569" : "#a1a1aa";
   const gridColor = isLight ? "#cbd5e1" : "rgba(255, 255, 255, 0.08)";
 
-  // Bar Chart - Weekly
-  const today = new Date();
-  const last7DaysLabels = [];
-  const last7DaysHours = [];
+  const isYearly = appState.insightsRange === "yearly";
 
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(today.getDate() - i);
-    last7DaysLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
-    
-    const dateStr = getLocalDateString(d);
-    const dayLogs = appState.logs.filter(log => getLocalDateString(new Date(log.startTime)) === dateStr);
-    const totalSecs = dayLogs.reduce((acc, log) => acc + log.duration, 0);
-    last7DaysHours.push(Number((totalSecs / 3600).toFixed(1)));
+  // Set headers dynamically
+  const chartTitleEl = document.getElementById("chart-focus-title");
+  if (chartTitleEl) {
+    chartTitleEl.innerText = isYearly ? "Monthly Focus Hours" : "Weekly Focus Hours";
+  }
+  const distTitleEl = document.getElementById("chart-dist-title");
+  if (distTitleEl) {
+    distTitleEl.innerText = isYearly ? "Yearly Distribution" : "Weekly Distribution";
+  }
+
+  const today = new Date();
+  const barLabels = [];
+  const barData = [];
+
+  if (isYearly) {
+    // Aggregation per Month (last 12 months)
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1); // Set to day 1 to avoid date-wrapping issues
+      d.setMonth(today.getMonth() - i);
+      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+      const yearSuffix = d.toLocaleDateString('en-US', { year: '2-digit' });
+      barLabels.push(`${monthName} '${yearSuffix}`);
+
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      const monthLogs = appState.logs.filter(log => {
+        const logDate = new Date(log.startTime);
+        return logDate.getMonth() === targetMonth && logDate.getFullYear() === targetYear;
+      });
+
+      const totalSecs = monthLogs.reduce((acc, log) => acc + log.duration, 0);
+      barData.push(Number((totalSecs / 3600).toFixed(1)));
+    }
+  } else {
+    // Aggregation per Day (last 7 days)
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      barLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+      
+      const dateStr = getLocalDateString(d);
+      const dayLogs = appState.logs.filter(log => getLocalDateString(new Date(log.startTime)) === dateStr);
+      const totalSecs = dayLogs.reduce((acc, log) => acc + log.duration, 0);
+      barData.push(Number((totalSecs / 3600).toFixed(1)));
+    }
   }
 
   const barCanvas = document.getElementById("weeklyHoursChart");
@@ -1041,10 +1095,10 @@ function renderCharts() {
     weeklyChart = new Chart(barCanvas, {
       type: 'bar',
       data: {
-        labels: last7DaysLabels,
+        labels: barLabels,
         datasets: [{
           label: 'Focus Hours',
-          data: last7DaysHours,
+          data: barData,
           backgroundColor: '#8b5cf6',
           borderRadius: 8,
           hoverBackgroundColor: '#a855f7'
@@ -1078,7 +1132,7 @@ function renderCharts() {
     });
   }
 
-  // Donut Chart - Subject distribution
+  // Donut Chart - Subject distribution (filtered by range)
   const subjectSums = {};
   appState.subjects.forEach(sub => {
     subjectSums[sub.name] = {
@@ -1087,7 +1141,18 @@ function renderCharts() {
     };
   });
 
-  appState.logs.forEach(log => {
+  const filteredLogs = appState.logs.filter(log => {
+    const logDate = new Date(log.startTime);
+    const diffTime = today - logDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    if (isYearly) {
+      return diffDays <= 365;
+    } else {
+      return diffDays <= 7;
+    }
+  });
+
+  filteredLogs.forEach(log => {
     const sub = appState.subjects.find(s => s.id === log.subjectId);
     if (sub) {
       if (!subjectSums[sub.name]) {
