@@ -1063,6 +1063,7 @@ function initInsights() {
 }
 
 function renderInsights() {
+  updateStreak();
   const logs = appState.logs;
 
   // KPI Calculations
@@ -1948,25 +1949,51 @@ function exitFocusSession() {
 }
 
 function updateStreak() {
-  const todayStr = getLocalDateString();
-  const lastStreakDate = localStorage.getItem("ypt_streak_date");
+  const logs = appState.logs || [];
+  if (logs.length === 0) {
+    appState.user.streak = 0;
+    localStorage.setItem("ypt_user", JSON.stringify(appState.user));
+    return;
+  }
+
+  // Get all unique local date strings of study logs
+  const studyDates = Array.from(new Set(logs.map(log => getLocalDateString(new Date(log.startTime)))));
   
-  if (lastStreakDate !== todayStr) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = getLocalDateString(yesterday);
+  // Sort descending (newest to oldest)
+  studyDates.sort((a, b) => new Date(b) - new Date(a));
+
+  const todayStr = getLocalDateString();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = getLocalDateString(yesterday);
+
+  // If the user hasn't studied today or yesterday, the streak is broken (0)
+  if (!studyDates.includes(todayStr) && !studyDates.includes(yesterdayStr)) {
+    appState.user.streak = 0;
+  } else {
+    // Start counting from the most recent study date (which is either today or yesterday)
+    let currentStreak = 0;
+    const checkDate = new Date();
     
-    if (lastStreakDate === yesterdayStr) {
-      appState.user.streak++;
-    } else if (lastStreakDate === null) {
-      appState.user.streak = 1;
-    } else {
-      appState.user.streak = 1;
+    // If they haven't studied today, start the check from yesterday
+    if (!studyDates.includes(todayStr)) {
+      checkDate.setDate(checkDate.getDate() - 1);
     }
     
-    localStorage.setItem("ypt_streak_date", todayStr);
-    localStorage.setItem("ypt_user", JSON.stringify(appState.user));
+    // Move backwards and count consecutive study days
+    while (true) {
+      const dateStr = getLocalDateString(checkDate);
+      if (studyDates.includes(dateStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    appState.user.streak = currentStreak;
   }
+
+  localStorage.setItem("ypt_user", JSON.stringify(appState.user));
 }
 
 function updateActiveSubjectBadge() {
