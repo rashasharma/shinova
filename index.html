@@ -75,6 +75,9 @@
 
       <!-- VIEW: FOCUS TIMER (Active session stopwatch/countdown) -->
       <div class="stage-view" id="view-focus">
+        <button class="stage-card-close-btn" id="btn-focus-close" title="End Session & Back to Home">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
         <div class="view-focus-content animate-fade-in">
           <div class="focus-subject-badge-wrapper" style="position: relative; z-index: 100;">
             <div class="focus-subject-badge" id="focus-subject-badge" style="cursor: pointer;" title="Switch Subject">
@@ -111,16 +114,16 @@
           <div class="focus-status-sub" id="focus-status-text">FOCUSING</div>
           <div class="focus-tap-hint">Click numbers to pause</div>
 
-          <!-- Rest & exit controls inside overlay -->
+          <!-- Rest controls inside overlay -->
           <div class="focus-view-actions">
             <button class="btn-control-pill" id="btn-focus-rest">
-              <span id="rest-icon-coffee">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>
+              <span id="rest-icon-pause">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pause"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>
               </span>
-              <span id="rest-icon-study" class="hidden">
+              <span id="rest-icon-play" class="hidden">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play"><polygon points="6 3 20 12 6 21 6 3"/></svg>
               </span>
-              <span id="rest-btn-text">Rest</span>
+              <span id="rest-btn-text">Pause</span>
             </button>
 
             <button class="btn-control-pill" id="btn-focus-mode-toggle">
@@ -131,11 +134,6 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timer"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="12" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
               </span>
               <span id="focus-mode-name">Stopwatch</span>
-            </button>
-
-            <button class="btn-control-pill primary" id="btn-exit-focus">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg>
-              <span>End Session</span>
             </button>
           </div>
           
