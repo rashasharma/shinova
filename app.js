@@ -98,7 +98,8 @@ let appState = {
   musicVolume: 70,
   libraryMode: "online",
   onlineTracks: [],
-  insightsRange: "weekly"
+  distributionRange: "weekly",
+  heatmapRange: "weekly"
 };
 
 // ==========================================
@@ -114,6 +115,8 @@ let timerInterval = null;
 let isResting = false;
 let restSeconds = 0;
 let restInterval = null;
+let hasLoggedCurrentSession = false;
+let breakStartTime = null;
 
 let currentMode = "stopwatch"; // 'stopwatch' or 'timer'
 let countdownDuration = 1500; // default 25 min (in seconds)
@@ -211,7 +214,9 @@ function saveActiveSessionState() {
     currentMode: currentMode,
     countdownDuration: countdownDuration,
     countdownRemaining: countdownRemaining,
-    lastTick: Date.now()
+    lastTick: Date.now(),
+    hasLoggedCurrentSession: hasLoggedCurrentSession,
+    breakStartTime: breakStartTime
   };
   localStorage.setItem("ypt_active_session", JSON.stringify(sessionState));
 }
@@ -426,6 +431,8 @@ function checkAndRecoverSession() {
     isResting = saved.isResting;
     restSeconds = saved.restSeconds;
     elapsedSeconds = saved.elapsedSeconds;
+    hasLoggedCurrentSession = saved.hasLoggedCurrentSession || false;
+    breakStartTime = saved.breakStartTime || null;
     
     // Add offline time to the ticking timer
     if (saved.timerRunning) {
@@ -602,6 +609,7 @@ function initData() {
   const localSubjects = localStorage.getItem("ypt_subjects");
   const localLogs = localStorage.getItem("ypt_logs");
   const localTodos = localStorage.getItem("ypt_todos");
+  const localBreaks = localStorage.getItem("ypt_breaks");
   const isInitialized = localStorage.getItem("ypt_initialized");
   const localCustomTracks = localStorage.getItem("ypt_custom_tracks");
   
@@ -614,6 +622,7 @@ function initData() {
   appState.musicShuffle = false;
   appState.libraryMode = "online";
   appState.onlineTracks = [];
+  appState.breaks = localBreaks ? JSON.parse(localBreaks) : [];
 
   if (localUser) {
     appState.user = JSON.parse(localUser);
@@ -633,10 +642,12 @@ function initData() {
     appState.subjects = [];
     appState.todos = [];
     appState.logs = [];
+    appState.breaks = [];
     
     localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
     localStorage.setItem("ypt_todos", JSON.stringify(appState.todos));
     localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+    localStorage.setItem("ypt_breaks", JSON.stringify(appState.breaks));
   }
 
   // Sync today's times from logs
@@ -765,6 +776,13 @@ function initNavigation() {
       }
     });
   }
+
+  // Bind stage card close buttons to return to home view
+  document.querySelectorAll(".stage-card-close-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      switchTab("home");
+    });
+  });
 }
 
 function switchTab(tabId) {
@@ -877,9 +895,10 @@ function deleteSubject(subjectId) {
 // ==========================================
 function initPlanner() {
   // Task Filter buttons
-  document.querySelectorAll(".filter-btn").forEach(btn => {
+  const plannerButtons = document.querySelectorAll(".todo-filters .filter-btn");
+  plannerButtons.forEach(btn => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+      plannerButtons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       renderTodoList(btn.getAttribute("data-filter"));
     });
@@ -888,7 +907,7 @@ function initPlanner() {
 
 function renderPlanner() {
   renderTimeline();
-  const activeFilterBtn = document.querySelector(".filter-btn.active");
+  const activeFilterBtn = document.querySelector(".todo-filters .filter-btn.active");
   const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
   renderTodoList(activeFilter);
 }
@@ -1023,7 +1042,7 @@ function toggleTodo(todoId) {
   if (todo) {
     todo.completed = !todo.completed;
     localStorage.setItem("ypt_todos", JSON.stringify(appState.todos));
-    const activeFilterBtn = document.querySelector(".filter-btn.active");
+    const activeFilterBtn = document.querySelector(".todo-filters .filter-btn.active");
     const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
     renderTodoList(activeFilter);
   }
@@ -1032,7 +1051,7 @@ function toggleTodo(todoId) {
 function deleteTodo(todoId) {
   appState.todos = appState.todos.filter(t => t.id !== todoId);
   localStorage.setItem("ypt_todos", JSON.stringify(appState.todos));
-  const activeFilterBtn = document.querySelector(".filter-btn.active");
+  const activeFilterBtn = document.querySelector(".todo-filters .filter-btn.active");
   const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
   renderTodoList(activeFilter);
 }
@@ -1041,14 +1060,14 @@ function deleteTodo(todoId) {
 // Insights & Stats Logic
 // ==========================================
 function initInsights() {
-  // Set up range togglers
-  document.querySelectorAll(".chart-toggle-btn").forEach(btn => {
+  // 1. Distribution range toggle
+  const distButtons = document.querySelectorAll(".dist-toggle-btn");
+  distButtons.forEach(btn => {
     btn.addEventListener("click", (e) => {
       const range = e.target.getAttribute("data-range");
-      appState.insightsRange = range;
+      appState.distributionRange = range;
       
-      // Update UI active class
-      document.querySelectorAll(".chart-toggle-btn").forEach(b => {
+      distButtons.forEach(b => {
         if (b.getAttribute("data-range") === range) {
           b.classList.add("active");
         } else {
@@ -1056,8 +1075,28 @@ function initInsights() {
         }
       });
       
-      // Redraw charts
+      // Update charts card
       renderCharts();
+    });
+  });
+
+  // 2. Heatmap range toggle
+  const heatmapButtons = document.querySelectorAll(".heatmap-toggle-btn");
+  heatmapButtons.forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const range = e.target.getAttribute("data-range");
+      appState.heatmapRange = range;
+      
+      heatmapButtons.forEach(b => {
+        if (b.getAttribute("data-range") === range) {
+          b.classList.add("active");
+        } else {
+          b.classList.remove("active");
+        }
+      });
+      
+      // Redraw insights dashboard (updates heatmap view)
+      renderInsights();
     });
   });
 }
@@ -1089,6 +1128,12 @@ function renderInsights() {
   setElementText("kpi-max-time", formatDurationHM(maxSeconds));
   setElementText("streak-count", `${appState.user.streak} Days`);
 
+  // Breaks KPIs
+  const totalBreaks = appState.breaks ? appState.breaks.length : 0;
+  const totalRestSeconds = appState.breaks ? appState.breaks.reduce((acc, b) => acc + b.duration, 0) : 0;
+  setElementText("kpi-total-breaks", totalBreaks);
+  setElementText("kpi-total-rest", formatDurationHM(totalRestSeconds));
+
   renderHeatmap(dailyTotals);
   renderCharts();
 }
@@ -1098,29 +1143,84 @@ function renderHeatmap(dailyTotals) {
   if (!heatmapGrid) return;
   heatmapGrid.innerHTML = "";
 
+  const heatmapTitle = document.getElementById("heatmap-title");
+  const isYearly = appState.heatmapRange === "yearly";
   const today = new Date();
-  
-  for (let i = 29; i >= 0; i--) {
-    const blockDate = new Date();
-    blockDate.setDate(today.getDate() - i);
-    const dateStr = getLocalDateString(blockDate);
 
-    const seconds = dailyTotals[dateStr] || 0;
-    const hours = seconds / 3600;
-
-    let level = "level-0";
-    if (hours > 0 && hours <= 1) level = "level-1";
-    else if (hours > 1 && hours <= 3) level = "level-2";
-    else if (hours > 3 && hours <= 5) level = "level-3";
-    else if (hours > 5) level = "level-4";
-
-    const block = document.createElement("div");
-    block.className = `heatmap-block ${level}`;
+  if (isYearly) {
+    if (heatmapTitle) heatmapTitle.innerText = "Monthly Focus Intensity (Last 12 Months)";
     
-    const tooltipText = `${blockDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${hours.toFixed(1)} hrs focused`;
-    block.setAttribute("data-tooltip", tooltipText);
+    // Style for yearly view (12 columns in 1 row)
+    heatmapGrid.style.gridTemplateColumns = "repeat(12, 1fr)";
+    heatmapGrid.style.gap = "8px";
+    heatmapGrid.style.maxWidth = "450px";
 
-    heatmapGrid.appendChild(block);
+    const logs = appState.logs || [];
+
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1); // Set to day 1 to avoid date wrapping overflow
+      d.setMonth(today.getMonth() - i);
+      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+      const yearSuffix = d.toLocaleDateString('en-US', { year: '2-digit' });
+      const label = `${monthName} '${yearSuffix}`;
+
+      const targetMonth = d.getMonth();
+      const targetYear = d.getFullYear();
+
+      // Sum study hours for this target month
+      const monthLogs = logs.filter(log => {
+        const logDate = new Date(log.startTime);
+        return logDate.getMonth() === targetMonth && logDate.getFullYear() === targetYear;
+      });
+
+      const seconds = monthLogs.reduce((acc, log) => acc + log.duration, 0);
+      const hours = seconds / 3600;
+
+      let level = "level-0";
+      if (hours > 0 && hours <= 10) level = "level-1";
+      else if (hours > 10 && hours <= 30) level = "level-2";
+      else if (hours > 30 && hours <= 60) level = "level-3";
+      else if (hours > 60) level = "level-4";
+
+      const block = document.createElement("div");
+      block.className = `heatmap-block ${level}`;
+      
+      const tooltipText = `${label}: ${hours.toFixed(1)} hrs focused`;
+      block.setAttribute("data-tooltip", tooltipText);
+
+      heatmapGrid.appendChild(block);
+    }
+  } else {
+    if (heatmapTitle) heatmapTitle.innerText = "Daily Focus Intensity (Last 30 Days)";
+    
+    // Restore weekly/monthly view styles (15 columns, 2 rows)
+    heatmapGrid.style.gridTemplateColumns = "repeat(15, 1fr)";
+    heatmapGrid.style.gap = "6px";
+    heatmapGrid.style.maxWidth = "450px";
+
+    for (let i = 29; i >= 0; i--) {
+      const blockDate = new Date();
+      blockDate.setDate(today.getDate() - i);
+      const dateStr = getLocalDateString(blockDate);
+
+      const seconds = dailyTotals[dateStr] || 0;
+      const hours = seconds / 3600;
+
+      let level = "level-0";
+      if (hours > 0 && hours <= 1) level = "level-1";
+      else if (hours > 1 && hours <= 3) level = "level-2";
+      else if (hours > 3 && hours <= 5) level = "level-3";
+      else if (hours > 5) level = "level-4";
+
+      const block = document.createElement("div");
+      block.className = `heatmap-block ${level}`;
+      
+      const tooltipText = `${blockDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${hours.toFixed(1)} hrs focused`;
+      block.setAttribute("data-tooltip", tooltipText);
+
+      heatmapGrid.appendChild(block);
+    }
   }
 }
 
@@ -1134,55 +1234,20 @@ function renderCharts() {
   const textColor = isLight ? "#475569" : "#a1a1aa";
   const gridColor = isLight ? "#cbd5e1" : "rgba(255, 255, 255, 0.08)";
 
-  const isYearly = appState.insightsRange === "yearly";
-
-  // Set headers dynamically
-  const chartTitleEl = document.getElementById("chart-focus-title");
-  if (chartTitleEl) {
-    chartTitleEl.innerText = isYearly ? "Monthly Focus Hours" : "Weekly Focus Hours";
-  }
-  const distTitleEl = document.getElementById("chart-dist-title");
-  if (distTitleEl) {
-    distTitleEl.innerText = isYearly ? "Yearly Distribution" : "Weekly Distribution";
-  }
-
   const today = new Date();
   const barLabels = [];
   const barData = [];
 
-  if (isYearly) {
-    // Aggregation per Month (last 12 months)
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1); // Set to day 1 to avoid date-wrapping issues
-      d.setMonth(today.getMonth() - i);
-      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-      const yearSuffix = d.toLocaleDateString('en-US', { year: '2-digit' });
-      barLabels.push(`${monthName} '${yearSuffix}`);
-
-      const targetMonth = d.getMonth();
-      const targetYear = d.getFullYear();
-
-      const monthLogs = appState.logs.filter(log => {
-        const logDate = new Date(log.startTime);
-        return logDate.getMonth() === targetMonth && logDate.getFullYear() === targetYear;
-      });
-
-      const totalSecs = monthLogs.reduce((acc, log) => acc + log.duration, 0);
-      barData.push(Number((totalSecs / 3600).toFixed(1)));
-    }
-  } else {
-    // Aggregation per Day (last 7 days)
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(today.getDate() - i);
-      barLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
-      
-      const dateStr = getLocalDateString(d);
-      const dayLogs = appState.logs.filter(log => getLocalDateString(new Date(log.startTime)) === dateStr);
-      const totalSecs = dayLogs.reduce((acc, log) => acc + log.duration, 0);
-      barData.push(Number((totalSecs / 3600).toFixed(1)));
-    }
+  // Aggregation per Day (last 7 days)
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(today.getDate() - i);
+    barLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+    
+    const dateStr = getLocalDateString(d);
+    const dayLogs = appState.logs.filter(log => getLocalDateString(new Date(log.startTime)) === dateStr);
+    const totalSecs = dayLogs.reduce((acc, log) => acc + log.duration, 0);
+    barData.push(Number((totalSecs / 3600).toFixed(1)));
   }
 
   const barCanvas = document.getElementById("weeklyHoursChart");
@@ -1228,7 +1293,7 @@ function renderCharts() {
     });
   }
 
-  // Donut Chart - Subject distribution (filtered by range)
+  // Donut Chart - Subject distribution (filtered by last 7 days)
   const subjectSums = {};
   appState.subjects.forEach(sub => {
     subjectSums[sub.name] = {
@@ -1236,6 +1301,12 @@ function renderCharts() {
       color: sub.color
     };
   });
+
+  const isYearly = appState.distributionRange === "yearly";
+  const distTitleEl = document.getElementById("chart-dist-title");
+  if (distTitleEl) {
+    distTitleEl.innerText = isYearly ? "Yearly Distribution" : "Weekly Distribution";
+  }
 
   const filteredLogs = appState.logs.filter(log => {
     const logDate = new Date(log.startTime);
@@ -1258,6 +1329,18 @@ function renderCharts() {
     }
   });
 
+  const filteredBreaks = (appState.breaks || []).filter(b => {
+    const breakDate = new Date(b.startTime);
+    const diffTime = today - breakDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    if (isYearly) {
+      return diffDays <= 365;
+    } else {
+      return diffDays <= 7;
+    }
+  });
+  const totalRestDuration = filteredBreaks.reduce((acc, b) => acc + b.duration, 0);
+
   const donutLabels = [];
   const donutData = [];
   const donutColors = [];
@@ -1265,10 +1348,16 @@ function renderCharts() {
   Object.keys(subjectSums).forEach(name => {
     if (subjectSums[name].duration > 0) {
       donutLabels.push(name);
-      donutData.push(Number((subjectSums[name].duration / 3600).toFixed(1)));
+      donutData.push(subjectSums[name].duration); // Raw seconds to prevent empty/zero slices
       donutColors.push(subjectSums[name].color);
     }
   });
+
+  if (totalRestDuration > 0) {
+    donutLabels.push("Rests");
+    donutData.push(totalRestDuration);
+    donutColors.push("#64748b");
+  }
 
   const donutCanvas = document.getElementById("subjectDistributionChart");
   if (donutCanvas) {
@@ -1309,6 +1398,24 @@ function renderCharts() {
             legend: {
               position: 'bottom',
               labels: { color: textColor }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const totalSeconds = context.raw;
+                  if (totalSeconds < 60) {
+                    return ` ${label}: ${totalSeconds}s`;
+                  }
+                  const hours = Math.floor(totalSeconds / 3600);
+                  const minutes = Math.floor((totalSeconds % 3600) / 60);
+                  if (hours > 0) {
+                    return ` ${label}: ${hours}h ${minutes}m`;
+                  } else {
+                    return ` ${label}: ${minutes}m`;
+                  }
+                }
+              }
             }
           }
         }
@@ -1402,7 +1509,7 @@ function initFocusMode() {
   if (focusClockDisplay) {
     focusClockDisplay.addEventListener("click", () => {
       if (timerRunning) {
-        pauseTimer();
+        pauseTimer(true);
       } else {
         startTimer();
       }
@@ -1412,7 +1519,7 @@ function initFocusMode() {
   if (focusFlipClock) {
     focusFlipClock.addEventListener("click", () => {
       if (timerRunning) {
-        pauseTimer();
+        pauseTimer(true);
       } else {
         startTimer();
       }
@@ -1458,7 +1565,7 @@ function initFocusMode() {
         if (!isEditable) {
           e.preventDefault(); // Prevent standard page scroll
           if (timerRunning) {
-            pauseTimer();
+            pauseTimer(true);
           } else {
             startTimer();
           }
@@ -1788,7 +1895,19 @@ function openEditSubjectModal(subjectId) {
 
 function startTimer() {
   if (isResting) {
+    const duration = restSeconds;
+    const startTime = breakStartTime;
     endRest();
+    if (hasLoggedCurrentSession) {
+      // It was a long break (> 20s), so start the new study session fresh
+      elapsedSeconds = 0;
+      countdownRemaining = countdownDuration;
+      sessionStart = new Date().toISOString();
+      hasLoggedCurrentSession = false;
+      
+      // Prompt for category asynchronously in the background
+      processRestBreakCategory(startTime, duration);
+    }
   }
   timerRunning = true;
   
@@ -1829,7 +1948,7 @@ function startTimer() {
   saveActiveSessionState();
 }
 
-function pauseTimer() {
+function pauseTimer(startResting = false) {
   timerRunning = false;
   clearInterval(timerInterval);
   setElementText("focus-status-text", "PAUSED");
@@ -1840,11 +1959,22 @@ function pauseTimer() {
   }
   document.title = "Paused | Shinova";
   saveActiveSessionState();
+
+  if (startResting) {
+    startRest();
+  }
 }
 
 function startRest() {
+  if (!hasStartedStudyToday()) {
+    showToast("Please start a study session first before resting.", "warning");
+    isResting = false;
+    return;
+  }
+
   isResting = true;
   restSeconds = 0;
+  breakStartTime = new Date().toISOString();
   
   const focusView = document.getElementById("view-focus");
   if (focusView) {
@@ -1867,6 +1997,25 @@ function startRest() {
     restSeconds++;
     updateFocusClockDisplay();
     document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+    
+    if (restSeconds > 20 && !hasLoggedCurrentSession) {
+      const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
+      if (focusTime >= 5 && activeSubjectId) {
+        const newLog = {
+          id: `log-${Date.now()}`,
+          subjectId: activeSubjectId,
+          startTime: sessionStart,
+          duration: focusTime
+        };
+        appState.logs.push(newLog);
+        localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+        updateTodayTimesFromLogs();
+        updateStreak();
+        showToast("Study session saved. Continuing rest break...", "success");
+      }
+      hasLoggedCurrentSession = true;
+    }
+    
     saveActiveSessionState();
   }, 1000);
   saveActiveSessionState();
@@ -1942,10 +2091,41 @@ function exitFocusSession() {
   }
 
   activeSubjectId = null;
+  hasLoggedCurrentSession = false;
   clearActiveSessionState();
 
   // Switch view to Home Space
   switchTab("home");
+}
+
+function hasStartedStudyToday() {
+  if (sessionStart) {
+    const startDay = getLocalDateString(new Date(sessionStart));
+    const todayStr = getLocalDateString();
+    if (startDay === todayStr) return true;
+  }
+  const todayStr = getLocalDateString();
+  const todayLogs = appState.logs.filter(log => getLocalDateString(new Date(log.startTime)) === todayStr);
+  return todayLogs.length > 0;
+}
+
+async function processRestBreakCategory(startTime, duration) {
+  const category = await showPrompt("In which category would you like to put the rest break in?", "General Break", "e.g. Tea, Coffee, Walk, Phone...");
+  const categoryText = (category && category.trim()) ? category.trim() : "General Break";
+  
+  const newBreak = {
+    id: `break-${Date.now()}`,
+    startTime: startTime,
+    duration: duration,
+    category: categoryText
+  };
+  
+  appState.breaks.push(newBreak);
+  localStorage.setItem("ypt_breaks", JSON.stringify(appState.breaks));
+  
+  if (document.getElementById("view-insights").classList.contains("active")) {
+    renderInsights();
+  }
 }
 
 function updateStreak() {
@@ -2182,7 +2362,7 @@ function initModals() {
             renderSubjectDropdown();
             
             // Get active filter for todo list
-            const activeFilterBtn = document.querySelector(".filter-btn.active");
+            const activeFilterBtn = document.querySelector(".todo-filters .filter-btn.active");
             const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
             renderTodoList(activeFilter);
             
@@ -2283,7 +2463,7 @@ function initModals() {
         
         document.getElementById("modal-todo").classList.remove("active");
         
-        const activeFilterBtn = document.querySelector(".filter-btn.active");
+        const activeFilterBtn = document.querySelector(".todo-filters .filter-btn.active");
         const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
         renderTodoList(activeFilter);
       }
