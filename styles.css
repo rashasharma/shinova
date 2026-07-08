@@ -318,6 +318,7 @@ body {
 
 /* Floating Card style for sub-view panels */
 .stage-view-card {
+  position: relative;
   width: 100%;
   max-width: 780px;
   max-height: 75vh;
@@ -329,6 +330,36 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border-radius: 28px;
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+}
+
+.stage-card-close-btn {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  padding: 0;
+}
+
+.stage-card-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.08);
+}
+
+.stage-card-close-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--text-primary);
 }
 
 .card-header {
@@ -852,7 +883,7 @@ body {
    ========================================== */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
 }
