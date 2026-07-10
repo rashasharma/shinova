@@ -1686,31 +1686,32 @@ function initFocusMode() {
   }
 }
 
-function openFocusSession(subjectId) {
-  activeSubjectId = subjectId;
-  const sub = appState.subjects.find(s => s.id === subjectId);
-  if (!sub) return;
-
-  // Sync Focus badge meta
+function updateFocusSubjectBadge(sub) {
   setElementText("focus-subject-name", sub.name);
   const focusDot = document.getElementById("focus-subject-dot");
   if (focusDot) {
     focusDot.style.color = sub.color;
     focusDot.style.backgroundColor = sub.color;
   }
-
   const focusBadge = document.getElementById("focus-subject-badge");
   if (focusBadge) {
     focusBadge.style.setProperty("--subj-theme-color", sub.color);
   }
+  setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
+}
+
+function openFocusSession(subjectId) {
+  activeSubjectId = subjectId;
+  const sub = appState.subjects.find(s => s.id === subjectId);
+  if (!sub) return;
+
+  updateFocusSubjectBadge(sub);
 
   // Reset focus variables
   elapsedSeconds = 0;
   isResting = false;
   restSeconds = 0;
   countdownRemaining = countdownDuration;
-
-  setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
 
   // Switch view to Focus Space
   switchTab("focus");
@@ -1729,10 +1730,11 @@ function openFocusSession(subjectId) {
 
 function changeActiveSubject(newSubjectId) {
   const oldSubjectId = activeSubjectId;
-  const wasRunning = timerRunning;
+  const sub = appState.subjects.find(s => s.id === newSubjectId);
+  if (!sub) return;
 
-  if (wasRunning) {
-    // If timer is running, log progress of the previous subject first
+  if (timerRunning) {
+    // Case A: Studying -> Terminate current session and start new session on new subject
     const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
     if (focusTime >= 5 && oldSubjectId) {
       const newLog = {
@@ -1747,17 +1749,45 @@ function changeActiveSubject(newSubjectId) {
       updateStreak();
     }
     
-    // Clear state
+    // Clear study state and open new subject
     pauseTimer();
     sessionStart = null;
-
-    // Switch details
     openFocusSession(newSubjectId);
     
     // Continue running immediately for the new subject
     startTimer();
+  } else if (isResting) {
+    // Case B: Resting -> Terminate previous study session if not already logged, but keep resting
+    if (!hasLoggedCurrentSession) {
+      const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
+      if (focusTime >= 5 && oldSubjectId) {
+        const newLog = {
+          id: `log-${Date.now()}`,
+          subjectId: oldSubjectId,
+          startTime: sessionStart,
+          duration: focusTime
+        };
+        appState.logs.push(newLog);
+        localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+        updateTodayTimesFromLogs();
+        updateStreak();
+      }
+      hasLoggedCurrentSession = true;
+    }
+
+    // Switch subject metadata only, do NOT stop resting clock
+    activeSubjectId = newSubjectId;
+    updateFocusSubjectBadge(sub);
+
+    // Reset study variables for when they resume study on the new subject
+    elapsedSeconds = 0;
+    countdownRemaining = countdownDuration;
+    sessionStart = null;
+    hasLoggedCurrentSession = false;
+    
+    saveActiveSessionState();
   } else {
-    // If paused, just open new subject (initializes in paused state)
+    // Case C: Paused (not studying, not resting) -> just open new subject
     openFocusSession(newSubjectId);
   }
 }
