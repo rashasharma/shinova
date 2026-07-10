@@ -99,7 +99,8 @@ let appState = {
   libraryMode: "online",
   onlineTracks: [],
   distributionRange: "weekly",
-  heatmapRange: "weekly"
+  heatmapRange: "weekly",
+  longestSession: { date: "", seconds: 0 }
 };
 
 // ==========================================
@@ -117,6 +118,7 @@ let restSeconds = 0;
 let restInterval = null;
 let hasLoggedCurrentSession = false;
 let breakStartTime = null;
+let currentSessionFocusSeconds = 0;
 
 let currentMode = "stopwatch"; // 'stopwatch' or 'timer'
 let countdownDuration = 1500; // default 25 min (in seconds)
@@ -216,7 +218,8 @@ function saveActiveSessionState() {
     countdownRemaining: countdownRemaining,
     lastTick: Date.now(),
     hasLoggedCurrentSession: hasLoggedCurrentSession,
-    breakStartTime: breakStartTime
+    breakStartTime: breakStartTime,
+    currentSessionFocusSeconds: currentSessionFocusSeconds
   };
   localStorage.setItem("ypt_active_session", JSON.stringify(sessionState));
 }
@@ -433,12 +436,14 @@ function checkAndRecoverSession() {
     elapsedSeconds = saved.elapsedSeconds;
     hasLoggedCurrentSession = saved.hasLoggedCurrentSession || false;
     breakStartTime = saved.breakStartTime || null;
+    currentSessionFocusSeconds = saved.currentSessionFocusSeconds || 0;
     
     // Add offline time to the ticking timer
     if (saved.timerRunning) {
       if (isResting) {
         restSeconds += offlineSeconds;
       } else {
+        currentSessionFocusSeconds += offlineSeconds;
         if (currentMode === "stopwatch") {
           elapsedSeconds += offlineSeconds;
         } else {
@@ -650,6 +655,18 @@ function initData() {
     localStorage.setItem("ypt_breaks", JSON.stringify(appState.breaks));
   }
 
+  // Load and reset longestSession if needed
+  const localLongest = localStorage.getItem("ypt_longest_session_today");
+  if (localLongest) {
+    appState.longestSession = JSON.parse(localLongest);
+  }
+  const todayStr = getLocalDateString();
+  if (appState.longestSession.date !== todayStr) {
+    appState.longestSession.date = todayStr;
+    appState.longestSession.seconds = 0;
+    localStorage.setItem("ypt_longest_session_today", JSON.stringify(appState.longestSession));
+  }
+
   // Sync today's times from logs
   updateTodayTimesFromLogs();
 }
@@ -675,6 +692,7 @@ function updateTodayTimesFromLogs() {
   let todayTotalSeconds = 0;
   appState.subjects.forEach(sub => todayTotalSeconds += sub.totalTime);
   setElementText("today-total-time-home", formatDurationHMS(todayTotalSeconds));
+  setElementText("today-longest-session-home", formatDurationHMS(appState.longestSession.seconds));
   
   localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
 }
@@ -1700,7 +1718,7 @@ function updateFocusSubjectBadge(sub) {
   setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
 }
 
-function openFocusSession(subjectId) {
+function openFocusSession(subjectId, isSwitchingSubject = false) {
   activeSubjectId = subjectId;
   const sub = appState.subjects.find(s => s.id === subjectId);
   if (!sub) return;
@@ -1712,6 +1730,10 @@ function openFocusSession(subjectId) {
   isResting = false;
   restSeconds = 0;
   countdownRemaining = countdownDuration;
+
+  if (!isSwitchingSubject) {
+    currentSessionFocusSeconds = 0;
+  }
 
   // Switch view to Focus Space
   switchTab("focus");
@@ -1749,10 +1771,10 @@ function changeActiveSubject(newSubjectId) {
       updateStreak();
     }
     
-    // Clear study state and open new subject
+    // Clear study state and open new subject, preserving current continuous session duration
     pauseTimer();
     sessionStart = null;
-    openFocusSession(newSubjectId);
+    openFocusSession(newSubjectId, true);
     
     // Continue running immediately for the new subject
     startTimer();
@@ -1779,7 +1801,7 @@ function changeActiveSubject(newSubjectId) {
     activeSubjectId = newSubjectId;
     updateFocusSubjectBadge(sub);
 
-    // Reset study variables for when they resume study on the new subject
+    // Reset study variables for when they resume study on the new subject (continuous session remains)
     elapsedSeconds = 0;
     countdownRemaining = countdownDuration;
     sessionStart = null;
@@ -1788,7 +1810,7 @@ function changeActiveSubject(newSubjectId) {
     saveActiveSessionState();
   } else {
     // Case C: Paused (not studying, not resting) -> just open new subject
-    openFocusSession(newSubjectId);
+    openFocusSession(newSubjectId, true);
   }
 }
 
@@ -1929,6 +1951,22 @@ function openEditSubjectModal(subjectId) {
   if (modalSub) modalSub.classList.add("active");
 }
 
+function trackContinuousFocusSession() {
+  currentSessionFocusSeconds++;
+  const todayStr = getLocalDateString();
+  
+  if (appState.longestSession.date !== todayStr) {
+    appState.longestSession.date = todayStr;
+    appState.longestSession.seconds = 0;
+  }
+
+  if (currentSessionFocusSeconds > appState.longestSession.seconds) {
+    appState.longestSession.seconds = currentSessionFocusSeconds;
+    localStorage.setItem("ypt_longest_session_today", JSON.stringify(appState.longestSession));
+    setElementText("today-longest-session-home", formatDurationHMS(appState.longestSession.seconds));
+  }
+}
+
 function startTimer() {
   if (isResting) {
     const duration = restSeconds;
@@ -1940,6 +1978,7 @@ function startTimer() {
       countdownRemaining = countdownDuration;
       sessionStart = new Date().toISOString();
       hasLoggedCurrentSession = false;
+      currentSessionFocusSeconds = 0;
       
       // Prompt for category asynchronously in the background
       processRestBreakCategory(startTime, duration);
@@ -1970,6 +2009,7 @@ function startTimer() {
   }
 
   timerInterval = setInterval(() => {
+    trackContinuousFocusSession();
     if (currentMode === "stopwatch") {
       elapsedSeconds++;
       updateFocusClockDisplay();
