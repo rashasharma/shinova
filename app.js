@@ -494,11 +494,11 @@ function checkAndRecoverSession() {
           focusView.classList.add("resting-active");
         }
         setElementText("focus-status-text", "RESTING");
-        const coffee = document.getElementById("rest-icon-coffee");
-        const study = document.getElementById("rest-icon-study");
-        if (coffee) coffee.classList.add("hidden");
-        if (study) study.classList.remove("hidden");
-        setElementText("rest-btn-text", "Study");
+        const pauseIcon = document.getElementById("rest-icon-pause");
+        const playIcon = document.getElementById("rest-icon-play");
+        if (pauseIcon) pauseIcon.classList.add("hidden");
+        if (playIcon) playIcon.classList.remove("hidden");
+        setElementText("rest-btn-text", "Play");
         
         clearInterval(restInterval);
         restInterval = setInterval(() => {
@@ -1502,7 +1502,7 @@ function initFocusMode() {
   const focusClockDisplay = document.getElementById("focus-clock-display");
   const focusFlipClock = document.getElementById("focus-flip-clock");
   const btnRest = document.getElementById("btn-focus-rest");
-  const btnExit = document.getElementById("btn-exit-focus");
+  const btnClose = document.getElementById("btn-focus-close");
   const btnModeToggle = document.getElementById("btn-focus-mode-toggle");
   
   // Click dial to toggle play/pause
@@ -1588,8 +1588,8 @@ function initFocusMode() {
   }
 
   // Exit & Save Focus Session
-  if (btnExit) {
-    btnExit.addEventListener("click", async () => {
+  if (btnClose) {
+    btnClose.addEventListener("click", async () => {
       if (await showConfirm("End study session and save progress?")) {
         exitFocusSession();
       }
@@ -1599,11 +1599,11 @@ function initFocusMode() {
   // Stopwatch vs Countdown timer mode toggle
   if (btnModeToggle) {
     btnModeToggle.addEventListener("click", async () => {
-      if (timerRunning) return; // Block switches during active sessions
-      
       if (currentMode === "stopwatch") {
         const userMins = await showPrompt("Enter countdown minutes:", "25");
         if (userMins === null) return; // Cancelled
+        
+        endAndSaveCurrentSession();
         
         currentMode = "timer";
         document.getElementById("focus-mode-icon-stopwatch").classList.add("hidden");
@@ -1613,13 +1613,19 @@ function initFocusMode() {
         const mins = parseInt(userMins) || 25;
         countdownDuration = mins * 60;
         countdownRemaining = countdownDuration;
-        setElementText("focus-clock-display", formatDurationHMS(countdownRemaining));
+        
+        // Auto-start focusing
+        startTimer();
       } else {
+        endAndSaveCurrentSession();
+        
         currentMode = "stopwatch";
         document.getElementById("focus-mode-icon-stopwatch").classList.remove("hidden");
         document.getElementById("focus-mode-icon-timer").classList.add("hidden");
         setElementText("focus-mode-name", "Stopwatch");
-        setElementText("focus-clock-display", formatDurationHMS(elapsedSeconds));
+        
+        // Auto-start focusing
+        startTimer();
       }
       saveActiveSessionState();
     });
@@ -1918,6 +1924,13 @@ function startTimer() {
   }
   setElementText("focus-status-text", "FOCUSING");
 
+  // Force Play/Pause button to show Pause state
+  const pauseIcon = document.getElementById("rest-icon-pause");
+  const playIcon = document.getElementById("rest-icon-play");
+  if (pauseIcon) pauseIcon.classList.remove("hidden");
+  if (playIcon) playIcon.classList.add("hidden");
+  setElementText("rest-btn-text", "Pause");
+
   updateFocusClockDisplay();
   clearInterval(timerInterval);
 
@@ -1983,12 +1996,12 @@ function startRest() {
   }
   setElementText("focus-status-text", "RESTING");
 
-  // Toggle coffee to play/stopwatch icon inside Rest pill
-  const coffee = document.getElementById("rest-icon-coffee");
-  const study = document.getElementById("rest-icon-study");
-  if (coffee) coffee.classList.add("hidden");
-  if (study) study.classList.remove("hidden");
-  setElementText("rest-btn-text", "Study");
+  // Toggle pause to play icon inside Play/Pause pill
+  const pauseIcon = document.getElementById("rest-icon-pause");
+  const playIcon = document.getElementById("rest-icon-play");
+  if (pauseIcon) pauseIcon.classList.add("hidden");
+  if (playIcon) playIcon.classList.remove("hidden");
+  setElementText("rest-btn-text", "Play");
   
   updateFocusClockDisplay();
   clearInterval(restInterval);
@@ -2025,11 +2038,11 @@ function endRest() {
   isResting = false;
   clearInterval(restInterval);
   
-  const coffee = document.getElementById("rest-icon-coffee");
-  const study = document.getElementById("rest-icon-study");
-  if (coffee) coffee.classList.remove("hidden");
-  if (study) study.classList.add("hidden");
-  setElementText("rest-btn-text", "Rest");
+  const pauseIcon = document.getElementById("rest-icon-pause");
+  const playIcon = document.getElementById("rest-icon-play");
+  if (pauseIcon) pauseIcon.classList.remove("hidden");
+  if (playIcon) playIcon.classList.add("hidden");
+  setElementText("rest-btn-text", "Pause");
   
   const focusView = document.getElementById("view-focus");
   if (focusView) {
@@ -2096,6 +2109,36 @@ function exitFocusSession() {
 
   // Switch view to Home Space
   switchTab("home");
+}
+
+function endAndSaveCurrentSession() {
+  // Clear ticking intervals
+  clearInterval(timerInterval);
+  clearInterval(restInterval);
+  timerRunning = false;
+  isResting = false;
+
+  // Save progress if session was active and hasn't been logged yet
+  const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
+  if (!hasLoggedCurrentSession && focusTime >= 5 && activeSubjectId) {
+    const newLog = {
+      id: `log-${Date.now()}`,
+      subjectId: activeSubjectId,
+      startTime: sessionStart,
+      duration: focusTime
+    };
+    appState.logs.push(newLog);
+    localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+    updateTodayTimesFromLogs();
+    updateStreak();
+    showToast("Previous study session saved.", "success");
+  }
+
+  // Reset session counters
+  elapsedSeconds = 0;
+  sessionStart = null;
+  hasLoggedCurrentSession = false;
+  clearActiveSessionState();
 }
 
 function hasStartedStudyToday() {
