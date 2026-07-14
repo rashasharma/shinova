@@ -688,9 +688,18 @@ function updateTodayTimesFromLogs() {
     }
   });
 
-  // Calculate total focus time today
+  // Calculate total focus time today (logged sessions + current live session)
   let todayTotalSeconds = 0;
   appState.subjects.forEach(sub => todayTotalSeconds += sub.totalTime);
+
+  // Add currently active (unlogged) session time if a session is running or paused
+  if (activeSubjectId && sessionStart && !hasLoggedCurrentSession) {
+    const liveSeconds = currentMode === "stopwatch"
+      ? elapsedSeconds
+      : (countdownDuration - countdownRemaining);
+    todayTotalSeconds += liveSeconds;
+  }
+
   setElementText("today-total-time-home", formatDurationHMS(todayTotalSeconds));
   setElementText("today-longest-session-home", formatDurationHMS(appState.longestSession.seconds));
   
@@ -1965,6 +1974,20 @@ function trackContinuousFocusSession() {
     localStorage.setItem("ypt_longest_session_today", JSON.stringify(appState.longestSession));
     setElementText("today-longest-session-home", formatDurationHMS(appState.longestSession.seconds));
   }
+
+  // Keep total focus time on home screen in sync with live (unlogged) session
+  let loggedTotal = 0;
+  const todayStrLocal = getLocalDateString();
+  appState.logs.forEach(log => {
+    if (getLocalDateString(new Date(log.startTime)) === todayStrLocal) {
+      loggedTotal += log.duration;
+    }
+  });
+  // Only add live seconds if this session hasn't been auto-saved yet (avoid double-count)
+  const liveAdd = hasLoggedCurrentSession ? 0 : (currentMode === "stopwatch"
+    ? elapsedSeconds + 1  // +1 because elapsedSeconds increments after this call
+    : (countdownDuration - countdownRemaining));
+  setElementText("today-total-time-home", formatDurationHMS(loggedTotal + liveAdd));
 }
 
 function startTimer() {
@@ -2175,6 +2198,7 @@ function exitFocusSession() {
 
   activeSubjectId = null;
   hasLoggedCurrentSession = false;
+  currentSessionFocusSeconds = 0;
   clearActiveSessionState();
 
   // Switch view to Home Space
@@ -2208,6 +2232,7 @@ function endAndSaveCurrentSession() {
   elapsedSeconds = 0;
   sessionStart = null;
   hasLoggedCurrentSession = false;
+  currentSessionFocusSeconds = 0;
   clearActiveSessionState();
 }
 
