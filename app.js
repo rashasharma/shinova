@@ -486,7 +486,7 @@ function checkAndRecoverSession() {
     if (focusBadge) {
       focusBadge.style.setProperty("--subj-theme-color", sub.color);
     }
-    setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
+    setElementText("focus-session-total-text", formatDurationHM(sub.totalTime));
     updateFocusClockDisplay();
 
     // Re-ticking behavior
@@ -813,6 +813,32 @@ function initNavigation() {
 }
 
 function switchTab(tabId) {
+  // If navigating to focus while a rest is active, restore the resting view
+  // (must be checked BEFORE !activeSubjectId, which would open a new session)
+  if (tabId === "focus" && isResting) {
+    // Show the focus view in resting state
+    document.querySelectorAll(".dock-btn[data-tab]").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === "focus");
+    });
+    document.querySelectorAll(".stage-view").forEach(view => {
+      view.classList.toggle("active", view.id === "view-focus");
+    });
+    const focusView = document.getElementById("view-focus");
+    if (focusView) {
+      focusView.classList.remove("focusing-active");
+      focusView.classList.add("resting-active");
+    }
+    setElementText("focus-status-text", "RESTING");
+    const pauseIcon = document.getElementById("rest-icon-pause");
+    const playIcon = document.getElementById("rest-icon-play");
+    if (pauseIcon) pauseIcon.classList.add("hidden");
+    if (playIcon) playIcon.classList.remove("hidden");
+    setElementText("rest-btn-text", "Play");
+    updateFocusClockDisplay();
+    hideHomeRestingIndicator();
+    return;
+  }
+
   if (tabId === "focus" && !activeSubjectId) {
     if (appState.subjects.length > 0) {
       openFocusSession(appState.subjects[0].id);
@@ -851,6 +877,29 @@ function switchTab(tabId) {
   // Render logic for specific views
   if (tabId === "home") {
     updateTodayTimesFromLogs();
+    // Show resting pill if a rest is still active
+    if (isResting) {
+      showHomeRestingIndicator();
+    } else {
+      hideHomeRestingIndicator();
+    }
+  } else if (tabId === "focus") {
+    // If a rest is still running from the home screen, restore the resting view
+    if (isResting && activeSubjectId) {
+      const focusView = document.getElementById("view-focus");
+      if (focusView) {
+        focusView.classList.remove("focusing-active");
+        focusView.classList.add("resting-active");
+      }
+      setElementText("focus-status-text", "RESTING");
+      const pauseIcon = document.getElementById("rest-icon-pause");
+      const playIcon = document.getElementById("rest-icon-play");
+      if (pauseIcon) pauseIcon.classList.add("hidden");
+      if (playIcon) playIcon.classList.remove("hidden");
+      setElementText("rest-btn-text", "Play");
+      updateFocusClockDisplay();
+      hideHomeRestingIndicator();
+    }
   } else if (tabId === "planner") {
     renderPlanner();
   } else if (tabId === "insights") {
@@ -1724,7 +1773,7 @@ function updateFocusSubjectBadge(sub) {
   if (focusBadge) {
     focusBadge.style.setProperty("--subj-theme-color", sub.color);
   }
-  setElementText("focus-session-total-text", `Session Today: ${formatDurationHM(sub.totalTime)}`);
+  setElementText("focus-session-total-text", formatDurationHM(sub.totalTime));
 }
 
 function openFocusSession(subjectId, isSwitchingSubject = false) {
@@ -2102,6 +2151,7 @@ function startRest() {
   restInterval = setInterval(() => {
     restSeconds++;
     updateFocusClockDisplay();
+    updateHomeRestingTimer(); // keep home screen in sync if resting from home
     document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
     
     if (restSeconds > 20 && !hasLoggedCurrentSession) {
@@ -2141,6 +2191,8 @@ function endRest() {
   if (focusView) {
     focusView.classList.remove("resting-active");
   }
+  hideHomeRestingIndicator();
+  document.title = "Shinova - Ambient Study Space & Planner";
   saveActiveSessionState();
 }
 
@@ -2174,35 +2226,74 @@ function updateFocusClockDisplay() {
 }
 
 function exitFocusSession() {
-  pauseTimer();
-  endRest();
+  pauseTimer(); // stops the study timer
 
   document.title = "Shinova - Ambient Study Space & Planner";
 
-  const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
-  
-  if (focusTime >= 5 && activeSubjectId) {
-    const newLog = {
-      id: `log-${Date.now()}`,
-      subjectId: activeSubjectId,
-      startTime: sessionStart,
-      duration: focusTime
-    };
-    
-    appState.logs.push(newLog);
-    localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
-    
-    updateTodayTimesFromLogs();
-    updateStreak();
+  // Save the study portion if not already logged
+  if (!hasLoggedCurrentSession) {
+    const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
+    if (focusTime >= 5 && activeSubjectId) {
+      const newLog = {
+        id: `log-${Date.now()}`,
+        subjectId: activeSubjectId,
+        startTime: sessionStart,
+        duration: focusTime
+      };
+      appState.logs.push(newLog);
+      localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+      updateTodayTimesFromLogs();
+      updateStreak();
+    }
   }
+
+  const wasResting = isResting;
 
   activeSubjectId = null;
   hasLoggedCurrentSession = false;
   currentSessionFocusSeconds = 0;
-  clearActiveSessionState();
 
-  // Switch view to Home Space
-  switchTab("home");
+  if (wasResting) {
+    // Rest was already running — keep it going, just go home
+    clearActiveSessionState();
+    switchTab("home");
+    showHomeRestingIndicator();
+  } else {
+    // Start a fresh rest so the user can decompress after ending manually
+    clearActiveSessionState();
+    restSeconds = 0;
+    isResting = true;
+    clearInterval(restInterval);
+    restInterval = setInterval(() => {
+      restSeconds++;
+      updateHomeRestingTimer();
+      updateFocusClockDisplay(); // keep focus clock in sync too
+      document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+      saveActiveSessionState();
+    }, 1000);
+    switchTab("home");
+    showHomeRestingIndicator();
+  }
+}
+
+function showHomeRestingIndicator() {
+  const indicator = document.getElementById("home-resting-indicator");
+  if (indicator) indicator.classList.remove("hidden");
+  updateHomeRestingTimer();
+}
+
+function hideHomeRestingIndicator() {
+  const indicator = document.getElementById("home-resting-indicator");
+  if (indicator) indicator.classList.add("hidden");
+}
+
+function updateHomeRestingTimer() {
+  const timerEl = document.getElementById("home-resting-timer");
+  if (timerEl) {
+    const m = Math.floor(restSeconds / 60);
+    const s = restSeconds % 60;
+    timerEl.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
 }
 
 function endAndSaveCurrentSession() {
