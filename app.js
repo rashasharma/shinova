@@ -228,6 +228,19 @@ function clearActiveSessionState() {
   localStorage.removeItem("ypt_active_session");
 }
 
+// ── Rest-only persistence (survives tab close even with no active subject) ──
+function saveRestOnlyState() {
+  const state = {
+    restStartTime: breakStartTime || (Date.now() - restSeconds * 1000),
+    date: getLocalDateString()
+  };
+  localStorage.setItem("ypt_rest_state", JSON.stringify(state));
+}
+
+function clearRestOnlyState() {
+  localStorage.removeItem("ypt_rest_state");
+}
+
 function saveAmbientSoundsState() {
   const activeSounds = {};
   document.querySelectorAll(".sound-item").forEach(item => {
@@ -387,6 +400,39 @@ function toggleClockStyle() {
 }
 
 function checkAndRecoverSession() {
+  // ── Rest-only recovery (no active study subject needed) ──
+  const restData = localStorage.getItem("ypt_rest_state");
+  if (restData) {
+    try {
+      const saved = JSON.parse(restData);
+      const todayStr = getLocalDateString();
+      if (saved.date === todayStr) {
+        // Same day — compute true elapsed rest from the real wall-clock start time
+        const startTimeMs = typeof saved.restStartTime === "string" ? Date.parse(saved.restStartTime) : saved.restStartTime;
+        const elapsedRest = Math.floor((Date.now() - startTimeMs) / 1000);
+        isResting = true;
+        restSeconds = Math.max(0, elapsedRest);
+        breakStartTime = saved.restStartTime;
+        // Show rest on home screen (subject already null — that's fine)
+        clearInterval(restInterval);
+        restInterval = setInterval(() => {
+          restSeconds++;
+          updateHomeRestingTimer();
+          updateFocusClockDisplay();
+          document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+          saveRestOnlyState();
+        }, 1000);
+        showHomeRestingIndicator();
+        showToast(`Rest recovered: ${formatDurationHMS(restSeconds)} so far`, "info");
+      } else {
+        // New day — discard rest state, don't carry over
+        clearRestOnlyState();
+      }
+    } catch (e) {
+      clearRestOnlyState();
+    }
+  }
+
   const savedData = localStorage.getItem("ypt_active_session");
   if (!savedData) return;
 
@@ -439,35 +485,33 @@ function checkAndRecoverSession() {
     currentSessionFocusSeconds = saved.currentSessionFocusSeconds || 0;
     
     // Add offline time to the ticking timer
-    if (saved.timerRunning) {
-      if (isResting) {
-        restSeconds += offlineSeconds;
+    if (isResting) {
+      restSeconds += offlineSeconds;
+    } else if (saved.timerRunning) {
+      currentSessionFocusSeconds += offlineSeconds;
+      if (currentMode === "stopwatch") {
+        elapsedSeconds += offlineSeconds;
       } else {
-        currentSessionFocusSeconds += offlineSeconds;
-        if (currentMode === "stopwatch") {
-          elapsedSeconds += offlineSeconds;
-        } else {
-          // If countdown timer completed while offline, transition to rest
-          if (countdownRemaining - offlineSeconds <= 0) {
-            const focusTime = countdownRemaining; // study duration completed
-            if (focusTime >= 5) {
-              const newLog = {
-                id: `log-${Date.now()}`,
-                subjectId: activeSubjectId,
-                startTime: sessionStart || new Date().toISOString(),
-                duration: focusTime
-              };
-              appState.logs.push(newLog);
-              localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
-              updateTodayTimesFromLogs();
-              updateStreak();
-            }
-            isResting = true;
-            restSeconds = offlineSeconds - countdownRemaining;
-            countdownRemaining = countdownDuration;
-          } else {
-            countdownRemaining -= offlineSeconds;
+        // If countdown timer completed while offline, transition to rest
+        if (countdownRemaining - offlineSeconds <= 0) {
+          const focusTime = countdownRemaining; // study duration completed
+          if (focusTime >= 5) {
+            const newLog = {
+              id: `log-${Date.now()}`,
+              subjectId: activeSubjectId,
+              startTime: sessionStart || new Date().toISOString(),
+              duration: focusTime
+            };
+            appState.logs.push(newLog);
+            localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+            updateTodayTimesFromLogs();
+            updateStreak();
           }
+          isResting = true;
+          restSeconds = offlineSeconds - countdownRemaining;
+          countdownRemaining = countdownDuration;
+        } else {
+          countdownRemaining -= offlineSeconds;
         }
       }
     }
@@ -490,56 +534,58 @@ function checkAndRecoverSession() {
     updateFocusClockDisplay();
 
     // Re-ticking behavior
-    if (saved.timerRunning) {
+    if (isResting) {
+      timerRunning = false;
       const focusView = document.getElementById("view-focus");
-      if (isResting) {
-        timerRunning = false;
-        if (focusView) {
-          focusView.classList.remove("focusing-active");
-          focusView.classList.add("resting-active");
-        }
-        setElementText("focus-status-text", "RESTING");
-        const pauseIcon = document.getElementById("rest-icon-pause");
-        const playIcon = document.getElementById("rest-icon-play");
-        if (pauseIcon) pauseIcon.classList.add("hidden");
-        if (playIcon) playIcon.classList.remove("hidden");
-        setElementText("rest-btn-text", "Play");
-        
-        clearInterval(restInterval);
-        restInterval = setInterval(() => {
-          restSeconds++;
-          updateFocusClockDisplay();
-          document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
-          saveActiveSessionState();
-        }, 1000);
-      } else {
-        timerRunning = true;
-        if (focusView) {
-          focusView.classList.remove("resting-active");
-          focusView.classList.add("focusing-active");
-        }
-        setElementText("focus-status-text", "FOCUSING");
-        
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-          if (currentMode === "stopwatch") {
-            elapsedSeconds++;
-            updateFocusClockDisplay();
-            document.title = `Focusing: ${formatDurationHMS(elapsedSeconds)} | Shinova`;
-          } else {
-            countdownRemaining--;
-            updateFocusClockDisplay();
-            document.title = `Focusing: ${formatDurationHMS(countdownRemaining)} | Shinova`;
-            if (countdownRemaining <= 0) {
-              clearInterval(timerInterval);
-              timerRunning = false;
-              showToast("Focus block completed! Time for a rest.", "success");
-              startRest();
-            }
-          }
-          saveActiveSessionState();
-        }, 1000);
+      if (focusView) {
+        focusView.classList.remove("focusing-active");
+        focusView.classList.add("resting-active");
       }
+      setElementText("focus-status-text", "RESTING");
+      const pauseIcon = document.getElementById("rest-icon-pause");
+      const playIcon = document.getElementById("rest-icon-play");
+      if (pauseIcon) pauseIcon.classList.add("hidden");
+      if (playIcon) playIcon.classList.remove("hidden");
+      setElementText("rest-btn-text", "Play");
+      
+      clearInterval(restInterval);
+      restInterval = setInterval(() => {
+        restSeconds++;
+        updateFocusClockDisplay();
+        updateHomeRestingTimer();
+        document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+        saveActiveSessionState();
+        saveRestOnlyState();
+      }, 1000);
+      showToast("Session recovered (resting)!", "success");
+    } else if (saved.timerRunning) {
+      timerRunning = true;
+      const focusView = document.getElementById("view-focus");
+      if (focusView) {
+        focusView.classList.remove("resting-active");
+        focusView.classList.add("focusing-active");
+      }
+      setElementText("focus-status-text", "FOCUSING");
+      
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (currentMode === "stopwatch") {
+          elapsedSeconds++;
+          updateFocusClockDisplay();
+          document.title = `Focusing: ${formatDurationHMS(elapsedSeconds)} | Shinova`;
+        } else {
+          countdownRemaining--;
+          updateFocusClockDisplay();
+          document.title = `Focusing: ${formatDurationHMS(countdownRemaining)} | Shinova`;
+          if (countdownRemaining <= 0) {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            showToast("Focus block completed! Time for a rest.", "success");
+            startRest();
+          }
+        }
+        saveActiveSessionState();
+      }, 1000);
       showToast("Session recovered!", "success");
     } else {
       timerRunning = false;
@@ -1788,6 +1834,7 @@ function openFocusSession(subjectId, isSwitchingSubject = false) {
   isResting = false;
   restSeconds = 0;
   countdownRemaining = countdownDuration;
+  clearRestOnlyState(); // starting fresh \u2014 discard any lingering rest state
 
   if (!isSwitchingSubject) {
     currentSessionFocusSeconds = 0;
@@ -2018,7 +2065,7 @@ function trackContinuousFocusSession() {
     appState.longestSession.seconds = 0;
   }
 
-  if (currentSessionFocusSeconds > appState.longestSession.seconds) {
+  if (currentSessionFocusSeconds >= 5 && currentSessionFocusSeconds > appState.longestSession.seconds) {
     appState.longestSession.seconds = currentSessionFocusSeconds;
     localStorage.setItem("ypt_longest_session_today", JSON.stringify(appState.longestSession));
     setElementText("today-longest-session-home", formatDurationHMS(appState.longestSession.seconds));
@@ -2153,6 +2200,7 @@ function startRest() {
     updateFocusClockDisplay();
     updateHomeRestingTimer(); // keep home screen in sync if resting from home
     document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+    saveRestOnlyState(); // persist so tab-close doesn't lose rest time
     
     if (restSeconds > 20 && !hasLoggedCurrentSession) {
       const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
@@ -2174,12 +2222,14 @@ function startRest() {
     
     saveActiveSessionState();
   }, 1000);
+  saveRestOnlyState(); // save immediately so even instant tab-close is covered
   saveActiveSessionState();
 }
 
 function endRest() {
   isResting = false;
   clearInterval(restInterval);
+  clearRestOnlyState(); // rest is over — don't restore it on next load
   
   const pauseIcon = document.getElementById("rest-icon-pause");
   const playIcon = document.getElementById("rest-icon-play");
@@ -2263,14 +2313,16 @@ function exitFocusSession() {
     clearActiveSessionState();
     restSeconds = 0;
     isResting = true;
+    breakStartTime = new Date().toISOString();
     clearInterval(restInterval);
     restInterval = setInterval(() => {
       restSeconds++;
       updateHomeRestingTimer();
       updateFocusClockDisplay(); // keep focus clock in sync too
       document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
-      saveActiveSessionState();
+      saveRestOnlyState();
     }, 1000);
+    saveRestOnlyState();
     switchTab("home");
     showHomeRestingIndicator();
   }
