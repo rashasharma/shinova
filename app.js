@@ -2063,6 +2063,7 @@ function trackContinuousFocusSession() {
   if (appState.longestSession.date !== todayStr) {
     appState.longestSession.date = todayStr;
     appState.longestSession.seconds = 0;
+    currentSessionFocusSeconds = 1; // Reset since a new day has started
   }
 
   if (currentSessionFocusSeconds >= 5 && currentSessionFocusSeconds > appState.longestSession.seconds) {
