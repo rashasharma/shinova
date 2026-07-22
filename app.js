@@ -454,21 +454,96 @@ function checkAndRecoverSession() {
     // Case A: User away for > 5 minutes (300 seconds)
     if (offlineSeconds > 300) {
       const focusTime = saved.currentMode === "stopwatch" ? saved.elapsedSeconds : (saved.countdownDuration - saved.countdownRemaining);
-      if (focusTime >= 5) {
+      
+      // Auto-save the study session if not logged yet
+      if (!saved.hasLoggedCurrentSession && focusTime >= 5) {
         const newLog = {
           id: `log-${Date.now()}`,
           subjectId: saved.activeSubjectId,
-          startTime: saved.sessionStart || new Date().toISOString(),
+          startTime: saved.sessionStart || new Date(saved.lastTick - focusTime * 1000).toISOString(),
           duration: focusTime
         };
         appState.logs.push(newLog);
         localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
         updateTodayTimesFromLogs();
         updateStreak();
-        showToast(`Auto-saved previous session: ${formatDurationHM(focusTime)}`, "info");
       }
-      clearActiveSessionState();
-      return;
+
+      const lastTickMs = saved.lastTick || Date.now();
+      const lastTickDateStr = getLocalDateString(new Date(lastTickMs));
+      const todayStr = getLocalDateString();
+
+      if (lastTickDateStr === todayStr) {
+        // SAME DAY: Recover and continue the rest break in progress since study stopped!
+        const bStart = saved.breakStartTime || new Date(lastTickMs).toISOString();
+        const bStartMs = typeof bStart === "string" ? Date.parse(bStart) : bStart;
+        const elapsedRest = Math.max(0, Math.floor((Date.now() - bStartMs) / 1000));
+
+        activeSubjectId = saved.activeSubjectId;
+        sessionStart = saved.sessionStart;
+        currentMode = saved.currentMode;
+        countdownDuration = saved.countdownDuration;
+        countdownRemaining = saved.countdownRemaining;
+        elapsedSeconds = 0; // Study session completed/saved; fresh study session on next Play
+        isResting = true;
+        restSeconds = elapsedRest;
+        breakStartTime = bStart;
+        hasLoggedCurrentSession = true; // Study log is saved, so next Play logs the rest break
+        currentSessionFocusSeconds = 0;
+        timerRunning = false;
+
+        saveActiveSessionState();
+        saveRestOnlyState();
+
+        // Restore UI view to Focus Screen
+        switchTab("focus");
+
+        // Restore Focus Badge metadata
+        setElementText("focus-subject-name", sub.name);
+        const focusDot = document.getElementById("focus-subject-dot");
+        if (focusDot) {
+          focusDot.style.color = sub.color;
+          focusDot.style.backgroundColor = sub.color;
+        }
+        const focusBadge = document.getElementById("focus-subject-badge");
+        if (focusBadge) {
+          focusBadge.style.setProperty("--subj-theme-color", sub.color);
+        }
+        setElementText("focus-session-total-text", formatDurationHM(sub.totalTime));
+        updateFocusClockDisplay();
+
+        const focusView = document.getElementById("view-focus");
+        if (focusView) {
+          focusView.classList.remove("focusing-active");
+          focusView.classList.add("resting-active");
+        }
+        setElementText("focus-status-text", "RESTING");
+        const pauseIcon = document.getElementById("rest-icon-pause");
+        const playIcon = document.getElementById("rest-icon-play");
+        if (pauseIcon) pauseIcon.classList.add("hidden");
+        if (playIcon) playIcon.classList.remove("hidden");
+        setElementText("rest-btn-text", "Play");
+
+        clearInterval(restInterval);
+        restInterval = setInterval(() => {
+          restSeconds++;
+          updateFocusClockDisplay();
+          updateHomeRestingTimer();
+          document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+          saveActiveSessionState();
+          saveRestOnlyState();
+        }, 1000);
+        showHomeRestingIndicator();
+
+        showToast(`Previous session saved. Rest break active: ${formatDurationHM(elapsedRest)}`, "info");
+        return;
+      } else {
+        // NEW DAY: Discard rest data since no study session followed it yesterday (rest is strictly between two sessions)
+        clearActiveSessionState();
+        clearRestOnlyState();
+        showToast(`Auto-saved yesterday's study session (${formatDurationHM(focusTime)}).`, "info");
+        return;
+      }
     }
 
     // Case B: User refreshed or had a quick interruption (<= 5 minutes)
