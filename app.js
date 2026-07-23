@@ -119,6 +119,7 @@ let restInterval = null;
 let hasLoggedCurrentSession = false;
 let breakStartTime = null;
 let currentSessionFocusSeconds = 0;
+const MAX_REST_SECONDS = 10800; // 3 hours (3 * 3600 seconds) cap
 
 let currentMode = "stopwatch"; // 'stopwatch' or 'timer'
 let countdownDuration = 1500; // default 25 min (in seconds)
@@ -410,6 +411,15 @@ function checkAndRecoverSession() {
         // Same day — compute true elapsed rest from the real wall-clock start time
         const startTimeMs = typeof saved.restStartTime === "string" ? Date.parse(saved.restStartTime) : saved.restStartTime;
         const elapsedRest = Math.floor((Date.now() - startTimeMs) / 1000);
+        
+        if (elapsedRest >= MAX_REST_SECONDS) {
+          // Exceeded 3-hour limit: cap rest and end session officially
+          clearRestOnlyState();
+          clearActiveSessionState();
+          showToast("Inactive break reached the 3-hour limit. Session officially ended.", "info");
+          return;
+        }
+
         isResting = true;
         restSeconds = Math.max(0, elapsedRest);
         breakStartTime = saved.restStartTime;
@@ -417,6 +427,18 @@ function checkAndRecoverSession() {
         clearInterval(restInterval);
         restInterval = setInterval(() => {
           restSeconds++;
+          if (restSeconds >= MAX_REST_SECONDS) {
+            restSeconds = MAX_REST_SECONDS;
+            clearInterval(restInterval);
+            updateFocusClockDisplay();
+            updateHomeRestingTimer();
+            document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+            showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+            endRest();
+            clearActiveSessionState();
+            clearRestOnlyState();
+            return;
+          }
           updateHomeRestingTimer();
           updateFocusClockDisplay();
           document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
@@ -479,6 +501,14 @@ function checkAndRecoverSession() {
         const bStartMs = typeof bStart === "string" ? Date.parse(bStart) : bStart;
         const elapsedRest = Math.max(0, Math.floor((Date.now() - bStartMs) / 1000));
 
+        if (elapsedRest >= MAX_REST_SECONDS) {
+          // Exceeded 3-hour limit: cap rest and end session officially
+          clearActiveSessionState();
+          clearRestOnlyState();
+          showToast("Previous session saved. Inactive break reached 3-hour limit — session officially ended.", "info");
+          return;
+        }
+
         activeSubjectId = saved.activeSubjectId;
         sessionStart = saved.sessionStart;
         currentMode = saved.currentMode;
@@ -527,6 +557,18 @@ function checkAndRecoverSession() {
         clearInterval(restInterval);
         restInterval = setInterval(() => {
           restSeconds++;
+          if (restSeconds >= MAX_REST_SECONDS) {
+            restSeconds = MAX_REST_SECONDS;
+            clearInterval(restInterval);
+            updateFocusClockDisplay();
+            updateHomeRestingTimer();
+            document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+            showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+            endRest();
+            clearActiveSessionState();
+            clearRestOnlyState();
+            return;
+          }
           updateFocusClockDisplay();
           updateHomeRestingTimer();
           document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
@@ -561,7 +603,7 @@ function checkAndRecoverSession() {
     
     // Add offline time to the ticking timer
     if (isResting) {
-      restSeconds += offlineSeconds;
+      restSeconds = Math.min(restSeconds + offlineSeconds, MAX_REST_SECONDS);
     } else if (saved.timerRunning) {
       currentSessionFocusSeconds += offlineSeconds;
       if (currentMode === "stopwatch") {
@@ -583,7 +625,7 @@ function checkAndRecoverSession() {
             updateStreak();
           }
           isResting = true;
-          restSeconds = offlineSeconds - countdownRemaining;
+          restSeconds = Math.min(offlineSeconds - countdownRemaining, MAX_REST_SECONDS);
           countdownRemaining = countdownDuration;
         } else {
           countdownRemaining -= offlineSeconds;
@@ -610,6 +652,14 @@ function checkAndRecoverSession() {
 
     // Re-ticking behavior
     if (isResting) {
+      if (restSeconds >= MAX_REST_SECONDS) {
+        restSeconds = MAX_REST_SECONDS;
+        showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+        endRest();
+        clearActiveSessionState();
+        clearRestOnlyState();
+        return;
+      }
       timerRunning = false;
       const focusView = document.getElementById("view-focus");
       if (focusView) {
@@ -626,6 +676,18 @@ function checkAndRecoverSession() {
       clearInterval(restInterval);
       restInterval = setInterval(() => {
         restSeconds++;
+        if (restSeconds >= MAX_REST_SECONDS) {
+          restSeconds = MAX_REST_SECONDS;
+          clearInterval(restInterval);
+          updateFocusClockDisplay();
+          updateHomeRestingTimer();
+          document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+          showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+          endRest();
+          clearActiveSessionState();
+          clearRestOnlyState();
+          return;
+        }
         updateFocusClockDisplay();
         updateHomeRestingTimer();
         document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
@@ -2273,6 +2335,18 @@ function startRest() {
 
   restInterval = setInterval(() => {
     restSeconds++;
+    if (restSeconds >= MAX_REST_SECONDS) {
+      restSeconds = MAX_REST_SECONDS;
+      clearInterval(restInterval);
+      updateFocusClockDisplay();
+      updateHomeRestingTimer();
+      document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+      showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+      endRest();
+      clearActiveSessionState();
+      clearRestOnlyState();
+      return;
+    }
     updateFocusClockDisplay();
     updateHomeRestingTimer(); // keep home screen in sync if resting from home
     document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
@@ -2393,6 +2467,18 @@ function exitFocusSession() {
     clearInterval(restInterval);
     restInterval = setInterval(() => {
       restSeconds++;
+      if (restSeconds >= MAX_REST_SECONDS) {
+        restSeconds = MAX_REST_SECONDS;
+        clearInterval(restInterval);
+        updateFocusClockDisplay();
+        updateHomeRestingTimer();
+        document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+        showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+        endRest();
+        clearActiveSessionState();
+        clearRestOnlyState();
+        return;
+      }
       updateHomeRestingTimer();
       updateFocusClockDisplay(); // keep focus clock in sync too
       document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
@@ -2469,11 +2555,12 @@ function hasStartedStudyToday() {
 async function processRestBreakCategory(startTime, duration) {
   const category = await showPrompt("In which category would you like to put the rest break in?", "General Break", "e.g. Tea, Coffee, Walk, Phone...");
   const categoryText = (category && category.trim()) ? category.trim() : "General Break";
+  const cappedDuration = Math.min(duration, MAX_REST_SECONDS);
   
   const newBreak = {
     id: `break-${Date.now()}`,
     startTime: startTime,
-    duration: duration,
+    duration: cappedDuration,
     category: categoryText
   };
   
