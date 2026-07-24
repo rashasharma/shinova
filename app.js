@@ -66,16 +66,7 @@ const WALLPAPERS = [
   { id: "winter-4", name: "Winter 4", url: "backgrounds/Winters (4).jpg" }
 ];
 
-const DEFAULT_MUSIC_TRACKS = [
-  { id: "default-1", title: "Autumn Chill Study", artist: "Lofi Focus", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", category: "lofi" },
-  { id: "default-2", title: "Midnight Tea", artist: "Cafe Jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", category: "jazz" },
-  { id: "default-3", title: "Warm Fireplace", artist: "Aesthetic Chill", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", category: "lofi" },
-  { id: "default-4", title: "Raindrops on Glass", artist: "Piano Dreams", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3", category: "piano" },
-  { id: "default-5", title: "Cyber Library", artist: "Synthwave Study", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3", category: "synth" },
-  { id: "default-6", title: "Morning Mist", artist: "Acoustic Focus", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3", category: "acoustic" },
-  { id: "default-7", title: "Cosmic Nebula", artist: "Ambient Focus", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3", category: "ambient" },
-  { id: "default-8", title: "Deep Mind Focus", artist: "Alpha Focus", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", category: "ambient" }
-];
+const DEFAULT_MUSIC_TRACKS = [];
 
 let appState = {
   user: {
@@ -3545,9 +3536,9 @@ function formatTimeMS(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// Get full merged library list
+// Get full track library list
 function getFullTrackLibrary() {
-  return [...DEFAULT_MUSIC_TRACKS, ...appState.customTracks];
+  return appState.customTracks;
 }
 
 // Bulk Upload Local MP3 Files
