@@ -103,6 +103,8 @@ let timerRunning = false;
 let elapsedSeconds = 0;
 let sessionStart = null;
 let timerInterval = null;
+let timerLastTick = null;
+let restLastTick = null;
 
 let isResting = false;
 let restSeconds = 0;
@@ -755,6 +757,55 @@ document.addEventListener("DOMContentLoaded", () => {
   initOnboarding();
   initCustomDialogs();
   initMusicSpace();
+
+  // Safari & Background Tab Catch-up Listener
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      const now = Date.now();
+      if (timerRunning && timerLastTick) {
+        const delta = Math.floor((now - timerLastTick) / 1000);
+        if (delta >= 1) {
+          timerLastTick = now;
+          trackContinuousFocusSession();
+          if (currentMode === "stopwatch") {
+            elapsedSeconds += delta;
+            currentSessionFocusSeconds += delta;
+          } else {
+            countdownRemaining -= delta;
+            currentSessionFocusSeconds += delta;
+            if (countdownRemaining <= 0) {
+              countdownRemaining = 0;
+              updateFocusClockDisplay();
+              clearInterval(timerInterval);
+              timerRunning = false;
+              showToast("Focus block completed! Time for a rest.", "success");
+              startRest();
+              return;
+            }
+          }
+          updateFocusClockDisplay();
+          saveActiveSessionState();
+        }
+      } else if (isResting && restLastTick) {
+        const delta = Math.floor((now - restLastTick) / 1000);
+        if (delta >= 1) {
+          restLastTick = now;
+          restSeconds = Math.min(restSeconds + delta, MAX_REST_SECONDS);
+          updateFocusClockDisplay();
+          updateHomeRestingTimer();
+          if (restSeconds >= MAX_REST_SECONDS) {
+            clearInterval(restInterval);
+            endRest();
+            clearActiveSessionState();
+            clearRestOnlyState();
+            showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+            return;
+          }
+          saveRestOnlyState();
+        }
+      }
+    }
+  });
   
   // Render lucide icons
   if (window.lucide) {
@@ -2250,25 +2301,37 @@ function startTimer() {
     sessionStart = new Date().toISOString();
   }
 
+  timerLastTick = Date.now();
+
   timerInterval = setInterval(() => {
-    trackContinuousFocusSession();
-    if (currentMode === "stopwatch") {
-      elapsedSeconds++;
-      updateFocusClockDisplay();
-      document.title = `Focusing: ${formatDurationHMS(elapsedSeconds)} | Shinova`;
-    } else {
-      countdownRemaining--;
-      updateFocusClockDisplay();
-      document.title = `Focusing: ${formatDurationHMS(countdownRemaining)} | Shinova`;
-      
-      if (countdownRemaining <= 0) {
-        clearInterval(timerInterval);
-        timerRunning = false;
-        showToast("Focus block completed! Time for a rest.", "success");
-        startRest();
+    const now = Date.now();
+    const delta = Math.floor((now - timerLastTick) / 1000);
+    if (delta >= 1) {
+      timerLastTick = now;
+      trackContinuousFocusSession();
+      if (currentMode === "stopwatch") {
+        elapsedSeconds += delta;
+        currentSessionFocusSeconds += delta;
+        updateFocusClockDisplay();
+        document.title = `Focusing: ${formatDurationHMS(elapsedSeconds)} | Shinova`;
+      } else {
+        countdownRemaining -= delta;
+        currentSessionFocusSeconds += delta;
+        updateFocusClockDisplay();
+        document.title = `Focusing: ${formatDurationHMS(countdownRemaining)} | Shinova`;
+        
+        if (countdownRemaining <= 0) {
+          countdownRemaining = 0;
+          updateFocusClockDisplay();
+          clearInterval(timerInterval);
+          timerRunning = false;
+          showToast("Focus block completed! Time for a rest.", "success");
+          startRest();
+          return;
+        }
       }
+      saveActiveSessionState();
     }
-    saveActiveSessionState();
   }, 1000);
   saveActiveSessionState();
 }
@@ -2318,44 +2381,51 @@ function startRest() {
   updateFocusClockDisplay();
   clearInterval(restInterval);
 
+  restLastTick = Date.now();
+
   restInterval = setInterval(() => {
-    restSeconds++;
-    if (restSeconds >= MAX_REST_SECONDS) {
-      restSeconds = MAX_REST_SECONDS;
-      clearInterval(restInterval);
-      updateFocusClockDisplay();
-      updateHomeRestingTimer();
-      document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
-      showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
-      endRest();
-      clearActiveSessionState();
-      clearRestOnlyState();
-      return;
-    }
-    updateFocusClockDisplay();
-    updateHomeRestingTimer(); // keep home screen in sync if resting from home
-    document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
-    saveRestOnlyState(); // persist so tab-close doesn't lose rest time
-    
-    if (restSeconds > 20 && !hasLoggedCurrentSession) {
-      const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
-      if (focusTime >= 5 && activeSubjectId) {
-        const newLog = {
-          id: `log-${Date.now()}`,
-          subjectId: activeSubjectId,
-          startTime: sessionStart,
-          duration: focusTime
-        };
-        appState.logs.push(newLog);
-        localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
-        updateTodayTimesFromLogs();
-        updateStreak();
-        showToast("Study session saved. Continuing rest break...", "success");
+    const now = Date.now();
+    const delta = Math.floor((now - restLastTick) / 1000);
+    if (delta >= 1) {
+      restLastTick = now;
+      restSeconds += delta;
+      if (restSeconds >= MAX_REST_SECONDS) {
+        restSeconds = MAX_REST_SECONDS;
+        clearInterval(restInterval);
+        updateFocusClockDisplay();
+        updateHomeRestingTimer();
+        document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+        showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+        endRest();
+        clearActiveSessionState();
+        clearRestOnlyState();
+        return;
       }
-      hasLoggedCurrentSession = true;
+      updateFocusClockDisplay();
+      updateHomeRestingTimer(); // keep home screen in sync if resting from home
+      document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+      saveRestOnlyState(); // persist so tab-close doesn't lose rest time
+      
+      if (restSeconds > 20 && !hasLoggedCurrentSession) {
+        const focusTime = currentMode === "stopwatch" ? elapsedSeconds : (countdownDuration - countdownRemaining);
+        if (focusTime >= 5 && activeSubjectId) {
+          const newLog = {
+            id: `log-${Date.now()}`,
+            subjectId: activeSubjectId,
+            startTime: sessionStart,
+            duration: focusTime
+          };
+          appState.logs.push(newLog);
+          localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+          updateTodayTimesFromLogs();
+          updateStreak();
+          showToast("Study session saved. Continuing rest break...", "success");
+        }
+        hasLoggedCurrentSession = true;
+      }
+      
+      saveActiveSessionState();
     }
-    
-    saveActiveSessionState();
   }, 1000);
   saveRestOnlyState(); // save immediately so even instant tab-close is covered
   saveActiveSessionState();
@@ -2450,24 +2520,30 @@ function exitFocusSession() {
     isResting = true;
     breakStartTime = new Date().toISOString();
     clearInterval(restInterval);
+    restLastTick = Date.now();
     restInterval = setInterval(() => {
-      restSeconds++;
-      if (restSeconds >= MAX_REST_SECONDS) {
-        restSeconds = MAX_REST_SECONDS;
-        clearInterval(restInterval);
-        updateFocusClockDisplay();
+      const now = Date.now();
+      const delta = Math.floor((now - restLastTick) / 1000);
+      if (delta >= 1) {
+        restLastTick = now;
+        restSeconds += delta;
+        if (restSeconds >= MAX_REST_SECONDS) {
+          restSeconds = MAX_REST_SECONDS;
+          clearInterval(restInterval);
+          updateFocusClockDisplay();
+          updateHomeRestingTimer();
+          document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
+          showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
+          endRest();
+          clearActiveSessionState();
+          clearRestOnlyState();
+          return;
+        }
         updateHomeRestingTimer();
-        document.title = `Resting: 03:00:00 (Limit Reached) | Shinova`;
-        showToast("Rest break reached the 3-hour limit. Session officially ended.", "info");
-        endRest();
-        clearActiveSessionState();
-        clearRestOnlyState();
-        return;
+        updateFocusClockDisplay(); // keep focus clock in sync too
+        document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
+        saveRestOnlyState();
       }
-      updateHomeRestingTimer();
-      updateFocusClockDisplay(); // keep focus clock in sync too
-      document.title = `Resting: ${formatDurationHMS(restSeconds)} | Shinova`;
-      saveRestOnlyState();
     }, 1000);
     saveRestOnlyState();
     switchTab("home");
