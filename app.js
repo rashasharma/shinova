@@ -134,12 +134,6 @@ let audioCtx = null;
 let weeklyChart = null;
 let subjectChart = null;
 
-// YouTube Player & Invidious Integration State
-let ytPlayer = null;
-let ytPlayerReady = false;
-let ytTimeInterval = null;
-let invidiousInstance = "https://inv.thepixora.com";
-
 // ==========================================
 // Helper Utility Functions
 // ==========================================
@@ -3207,15 +3201,109 @@ function initCustomDialogs() {
 }
 
 // ==========================================
-// Music Space Manager (Lo-fi Library & Custom Playlist)
+// Music Space Manager (Local Library, Bulk Upload & Soundboard)
 // ==========================================
+
+// ── IndexedDB Store for Persistent Bulk MP3 Audio Files ──
+let musicDB = null;
+
+function openMusicDB() {
+  return new Promise((resolve) => {
+    if (musicDB) return resolve(musicDB);
+    const req = indexedDB.open("ShinovaMusicDB", 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("custom_tracks")) {
+        db.createObjectStore("custom_tracks", { keyPath: "id" });
+      }
+    };
+    req.onsuccess = (e) => {
+      musicDB = e.target.result;
+      resolve(musicDB);
+    };
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function saveCustomTrackToDB(trackRecord) {
+  const db = await openMusicDB();
+  if (!db) return;
+  return new Promise((resolve) => {
+    const tx = db.transaction("custom_tracks", "readwrite");
+    const store = tx.objectStore("custom_tracks");
+    store.put(trackRecord);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function removeCustomTrackFromDB(id) {
+  const db = await openMusicDB();
+  if (!db) return;
+  return new Promise((resolve) => {
+    const tx = db.transaction("custom_tracks", "readwrite");
+    const store = tx.objectStore("custom_tracks");
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function loadSavedCustomTracksFromDB() {
+  const db = await openMusicDB();
+  if (!db) return [];
+  return new Promise((resolve) => {
+    const tx = db.transaction("custom_tracks", "readonly");
+    const store = tx.objectStore("custom_tracks");
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const items = req.result || [];
+      const tracks = items.map(item => {
+        const blobUrl = URL.createObjectURL(item.blob);
+        return {
+          id: item.id,
+          title: item.title,
+          artist: item.artist || "Local Audio File",
+          url: blobUrl,
+          category: "local",
+          isCustom: true
+        };
+      });
+      resolve(tracks);
+    };
+    req.onerror = () => resolve([]);
+  });
+}
+
 function initMusicSpace() {
-  loadYouTubeAPI();
   const musicToggleBtn = document.getElementById("btn-toggle-music");
   const soundboardToggleBtn = document.getElementById("btn-toggle-soundboard");
   const musicWidget = document.getElementById("floating-music-widget");
   const globalPlayer = document.getElementById("music-global-player");
   const fileInput = document.getElementById("music-local-file-input");
+  const bulkUploadBtn = document.getElementById("btn-bulk-upload-music");
+
+  // Load persistent bulk-uploaded MP3s from IndexedDB
+  loadSavedCustomTracksFromDB().then(savedTracks => {
+    appState.customTracks = savedTracks;
+    renderMusicLibrary();
+  });
+
+  // Bulk Upload MP3 Files handler
+  if (bulkUploadBtn && fileInput) {
+    bulkUploadBtn.addEventListener("click", () => {
+      fileInput.click();
+    });
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        addLocalFileTracks(e.target.files);
+        fileInput.value = "";
+      }
+    });
+  }
 
   function openMusicWidgetWithTab(tabId, toggleBtn) {
     const tabButtons = document.querySelectorAll(".music-tab-btn");
@@ -3307,8 +3395,6 @@ function initMusicSpace() {
 
   // Close when clicking outside
   document.addEventListener("click", (e) => {
-    // If the clicked element is no longer in the DOM (e.g. removed during library re-render),
-    // we assume it was inside the widget and do not close it.
     if (!document.body.contains(e.target)) return;
 
     if (musicWidget && musicWidget.classList.contains("active") && 
@@ -3318,11 +3404,6 @@ function initMusicSpace() {
         e.target !== soundboardToggleBtn && 
         (!soundboardToggleBtn || !soundboardToggleBtn.contains(e.target))) {
       
-      const trackModal = document.getElementById("modal-add-track");
-      if (trackModal && trackModal.classList.contains("active")) return;
-      const confirmModal = document.getElementById("modal-custom-confirm");
-      if (confirmModal && confirmModal.classList.contains("active")) return;
-
       closeMusicWidget();
     }
   });
@@ -3340,9 +3421,6 @@ function initMusicSpace() {
       localStorage.setItem("ypt_music_volume", vol);
       if (globalPlayer) {
         globalPlayer.volume = vol / 100;
-      }
-      if (ytPlayerReady && ytPlayer && ytPlayer.setVolume) {
-        ytPlayer.setVolume(vol);
       }
     });
   }
@@ -3416,9 +3494,6 @@ function initMusicSpace() {
   const progressBar = document.getElementById("music-progress-bar");
   if (progressBar && globalPlayer) {
     globalPlayer.addEventListener("timeupdate", () => {
-      const currentTrack = appState.currentTrackIndex !== null ? appState.musicQueue[appState.currentTrackIndex] : null;
-      if (currentTrack && currentTrack.category === "youtube") return;
-
       if (globalPlayer.duration) {
         const pct = (globalPlayer.currentTime / globalPlayer.duration) * 100;
         progressBar.value = pct;
@@ -3429,59 +3504,26 @@ function initMusicSpace() {
     });
 
     globalPlayer.addEventListener("loadedmetadata", () => {
-      const currentTrack = appState.currentTrackIndex !== null ? appState.musicQueue[appState.currentTrackIndex] : null;
-      if (currentTrack && currentTrack.category === "youtube") return;
       document.getElementById("music-time-total").innerText = formatTimeMS(globalPlayer.duration);
     });
 
     globalPlayer.addEventListener("ended", () => {
-      const currentTrack = appState.currentTrackIndex !== null ? appState.musicQueue[appState.currentTrackIndex] : null;
-      if (currentTrack && currentTrack.category === "youtube") return;
       handleTrackEnded();
     });
 
     progressBar.addEventListener("input", (e) => {
-      const currentTrack = appState.currentTrackIndex !== null ? appState.musicQueue[appState.currentTrackIndex] : null;
-      if (currentTrack && currentTrack.category === "youtube") {
-        if (ytPlayerReady && ytPlayer && ytPlayer.getDuration) {
-          const time = (parseFloat(e.target.value) / 100) * ytPlayer.getDuration();
-          ytPlayer.seekTo(time, true);
-        }
-      } else {
-        if (globalPlayer.duration) {
-          const time = (parseFloat(e.target.value) / 100) * globalPlayer.duration;
-          globalPlayer.currentTime = time;
-        }
+      if (globalPlayer.duration) {
+        const time = (parseFloat(e.target.value) / 100) * globalPlayer.duration;
+        globalPlayer.currentTime = time;
       }
     });
   }
 
-  // Search Library
+  // Filter Library Songs
   const searchInput = document.getElementById("music-search");
-  let onlineSearchTimeout = null;
   if (searchInput) {
     searchInput.addEventListener("input", () => {
-      if (onlineSearchTimeout) {
-        clearTimeout(onlineSearchTimeout);
-      }
-      
-      const query = searchInput.value.trim();
-      if (!query) {
-        const container = document.getElementById("music-library-list");
-        if (container) {
-          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">Enter text to search...</div>`;
-        }
-        return;
-      }
-      
-      const container = document.getElementById("music-library-list");
-      if (container) {
-        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">Searching...</div>`;
-      }
-      
-      onlineSearchTimeout = setTimeout(() => {
-        searchOnlineTracks(query);
-      }, 500);
+      renderMusicLibrary();
     });
   }
 
@@ -3493,7 +3535,6 @@ function initMusicSpace() {
     });
   }
 
-  // Render initial count
   updateQueueCountBadge();
 }
 
@@ -3504,127 +3545,97 @@ function formatTimeMS(seconds) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// Get the merged tracks list (default + custom URLs + custom local files)
+// Get full merged library list
 function getFullTrackLibrary() {
   return [...DEFAULT_MUSIC_TRACKS, ...appState.customTracks];
 }
 
-// Render Library List
+// Bulk Upload Local MP3 Files
+async function addLocalFileTracks(fileList) {
+  if (!fileList || fileList.length === 0) return;
+  const files = Array.from(fileList);
+  let addedCount = 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    let title = file.name;
+    const dotIdx = title.lastIndexOf(".");
+    if (dotIdx !== -1) title = title.substring(0, dotIdx);
+
+    const trackId = `local-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`;
+    const blobUrl = URL.createObjectURL(file);
+
+    const trackRecord = {
+      id: trackId,
+      title: title,
+      artist: "Local MP3",
+      blob: file
+    };
+
+    await saveCustomTrackToDB(trackRecord);
+
+    appState.customTracks.push({
+      id: trackId,
+      title: title,
+      artist: "Local MP3",
+      url: blobUrl,
+      category: "local",
+      isCustom: true
+    });
+    addedCount++;
+  }
+
+  renderMusicLibrary();
+  showToast(`Added ${addedCount} song(s) to local library!`, "success");
+}
+
+// Delete Custom Uploaded Track
+async function deleteCustomTrack(trackId) {
+  const track = appState.customTracks.find(t => t.id === trackId);
+  if (track && track.url) {
+    try { URL.revokeObjectURL(track.url); } catch (e) {}
+  }
+  await removeCustomTrackFromDB(trackId);
+
+  appState.customTracks = appState.customTracks.filter(t => t.id !== trackId);
+  appState.musicQueue = appState.musicQueue.filter(t => t.id !== trackId);
+  updateQueueCountBadge();
+
+  renderMusicLibrary();
+  renderMusicQueue();
+  showToast("Track removed from library", "info");
+}
+
+// Render Local Library List
 function renderMusicLibrary() {
-  renderOnlineLibrary();
-}
-
-async function initInvidiousInstance() {
-  try {
-    const res = await fetch("https://api.invidious.io/instances.json");
-    const data = await res.json();
-    for (const item of data) {
-      const details = item[1];
-      if (details.type === "https" && details.cors === true && details.api === true) {
-        try {
-          const testRes = await fetch(`${details.uri}/api/v1/search?q=test&limit=1`);
-          if (testRes.ok) {
-            invidiousInstance = details.uri;
-            console.log("Selected Invidious Instance:", invidiousInstance);
-            return;
-          }
-        } catch (e) {}
-      }
-    }
-  } catch (err) {
-    console.warn("Could not load Invidious instances, using fallback:", invidiousInstance);
-  }
-}
-
-async function searchOnlineTracks(query) {
-  if (!query) {
-    appState.onlineTracks = [];
-    renderOnlineLibrary();
-    return;
-  }
-  
-  const searchQuery = query;
-  
-  if (!invidiousInstance) {
-    await initInvidiousInstance();
-  }
-  
-  const limit = 25;
-  const url = `${invidiousInstance}/api/v1/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}`;
-
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const data = await res.json();
-    
-    if (data && Array.isArray(data)) {
-      const videos = data.filter(item => item.type === "video" || item.type === "short");
-      appState.onlineTracks = videos.map(item => ({
-        id: `youtube-${item.videoId}`,
-        title: item.title,
-        artist: item.author,
-        url: item.videoId,
-        image: `https://img.youtube.com/vi/${item.videoId}/hqdefault.jpg`,
-        category: "youtube",
-        videoId: item.videoId
-      }));
-    } else {
-      appState.onlineTracks = [];
-    }
-  } catch (err) {
-    console.error("Error searching Invidious tracks:", err);
-    try {
-      console.log("Retrying search with fresh instance list...");
-      await initInvidiousInstance();
-      const retryUrl = `${invidiousInstance}/api/v1/search?q=${encodeURIComponent(searchQuery)}&limit=${limit}`;
-      const res = await fetch(retryUrl);
-      const data = await res.json();
-      if (data && Array.isArray(data)) {
-        const videos = data.filter(item => item.type === "video" || item.type === "short");
-        appState.onlineTracks = videos.map(item => ({
-          id: `youtube-${item.videoId}`,
-          title: item.title,
-          artist: item.author,
-          url: item.videoId,
-          image: `https://img.youtube.com/vi/${item.videoId}/hqdefault.jpg`,
-          category: "youtube",
-          videoId: item.videoId
-        }));
-      } else {
-        appState.onlineTracks = [];
-      }
-    } catch (retryErr) {
-      console.error("Invidious search retry failed:", retryErr);
-      appState.onlineTracks = [];
-      showToast("Online search offline. Try again.", "danger");
-    }
-  }
-
-  if (appState.libraryMode === 'online') {
-    renderOnlineLibrary();
-  }
-}
-
-function renderOnlineLibrary() {
   const container = document.getElementById("music-library-list");
   if (!container) return;
 
   container.innerHTML = "";
 
   const searchInput = document.getElementById("music-search");
-  const query = searchInput ? searchInput.value.trim() : "";
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
-  if (!query) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">Enter text to search...</div>`;
+  let tracks = getFullTrackLibrary();
+
+  if (query) {
+    tracks = tracks.filter(t => 
+      t.title.toLowerCase().includes(query) || 
+      t.artist.toLowerCase().includes(query)
+    );
+  }
+
+  if (tracks.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">
+        No songs found.<br>
+        <span style="font-size: 0.7rem; opacity: 0.6;">Click 'Upload MP3s' to add local songs!</span>
+      </div>
+    `;
     return;
   }
 
-  if (appState.onlineTracks.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">No tracks found. Try another search!</div>`;
-    return;
-  }
-
-  appState.onlineTracks.forEach(track => {
+  tracks.forEach(track => {
     const item = document.createElement("div");
     item.className = "library-track-item";
     
@@ -3635,21 +3646,25 @@ function renderOnlineLibrary() {
       item.classList.add("active");
     }
 
-    const imgHtml = track.image ? `<img src="${track.image}" class="track-item-artwork" alt="artwork">` : '';
+    const deleteBtnHtml = track.isCustom ? `
+      <button class="track-item-btn delete-track" title="Delete Track" style="color: var(--danger, #ef4444);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </button>
+    ` : '';
 
     item.innerHTML = `
-      ${imgHtml}
-      <div class="track-item-info">
-        <span class="track-item-title">${track.title}</span>
-        <span class="track-item-artist">${track.artist}</span>
+      <div class="track-item-info" style="cursor: pointer; flex: 1; overflow: hidden; padding-right: 6px;">
+        <span class="track-item-title" style="display: block; font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${track.title}</span>
+        <span class="track-item-artist" style="display: block; font-size: 0.7rem; color: var(--text-muted); opacity: 0.7;">${track.artist}</span>
       </div>
-      <div class="track-item-actions">
+      <div class="track-item-actions" style="display: flex; gap: 4px; align-items: center;">
         <button class="track-item-btn play" title="Play Now">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
         </button>
         <button class="track-item-btn enqueue" title="Add to Queue">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
+        ${deleteBtnHtml}
       </div>
     `;
 
@@ -3665,88 +3680,18 @@ function renderOnlineLibrary() {
       addTrackToQueue(track, false);
     });
 
+    if (track.isCustom) {
+      const delBtn = item.querySelector(".delete-track");
+      if (delBtn) {
+        delBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteCustomTrack(track.id);
+        });
+      }
+    }
+
     container.appendChild(item);
   });
-}
-
-function loadYouTubeAPI() {
-  if (window.YT) return;
-  
-  window.onYouTubeIframeAPIReady = function() {
-    const container = document.createElement("div");
-    container.id = "youtube-player-container";
-    container.style.position = "absolute";
-    container.style.width = "1px";
-    container.style.height = "1px";
-    container.style.opacity = "0";
-    container.style.pointerEvents = "none";
-    document.body.appendChild(container);
-
-    ytPlayer = new YT.Player("youtube-player-container", {
-      height: "1",
-      width: "1",
-      videoId: "",
-      playerVars: {
-        playsinline: 1,
-        controls: 0,
-        disablekb: 1,
-        fs: 0,
-        rel: 0,
-        modestbranding: 1
-      },
-      events: {
-        onReady: (event) => {
-          ytPlayerReady = true;
-          ytPlayer.setVolume(appState.musicVolume);
-        },
-        onStateChange: (event) => {
-          if (event.data === YT.PlayerState.ENDED) {
-            handleTrackEnded();
-          } else if (event.data === YT.PlayerState.PLAYING) {
-            appState.musicPlaying = true;
-            updateMusicControlIcons();
-          } else if (event.data === YT.PlayerState.PAUSED) {
-            appState.musicPlaying = false;
-            updateMusicControlIcons();
-          }
-        }
-      }
-    });
-  };
-
-  const tag = document.createElement('script');
-  tag.src = "https://www.youtube.com/iframe_api";
-  const firstScriptTag = document.getElementsByTagName('script')[0];
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-}
-
-function startYouTubeTimeUpdater() {
-  if (ytTimeInterval) clearInterval(ytTimeInterval);
-  
-  ytTimeInterval = setInterval(() => {
-    const currentTrack = appState.currentTrackIndex !== null ? appState.musicQueue[appState.currentTrackIndex] : null;
-    if (!currentTrack || currentTrack.category !== "youtube") {
-      clearInterval(ytTimeInterval);
-      return;
-    }
-    
-    if (ytPlayerReady && ytPlayer && ytPlayer.getCurrentTime && ytPlayer.getDuration) {
-      try {
-        const current = ytPlayer.getCurrentTime();
-        const duration = ytPlayer.getDuration();
-        if (duration) {
-          const pct = (current / duration) * 100;
-          const progressBar = document.getElementById("music-progress-bar");
-          if (progressBar) progressBar.value = pct;
-          
-          document.getElementById("music-time-current").innerText = formatTimeMS(current);
-          document.getElementById("music-time-total").innerText = formatTimeMS(duration);
-        }
-      } catch (e) {
-        console.warn("YouTube time update failed:", e);
-      }
-    }
-  }, 500);
 }
 
 // Render Queue List
@@ -3780,7 +3725,6 @@ function renderMusicQueue() {
       </button>
     `;
 
-    // Click track to switch play to it
     item.querySelector(".queue-track-info").addEventListener("click", () => {
       playQueueTrack(index);
     });
@@ -3800,73 +3744,6 @@ function updateQueueCountBadge() {
   }
 }
 
-// Add Track to Library (Custom URL)
-function addCustomUrlTrack(title, artist, url) {
-  const newTrack = {
-    id: `custom-url-${Date.now()}`,
-    title: title,
-    artist: artist || "Custom Stream",
-    url: url,
-    category: "custom"
-  };
-
-  appState.customTracks.push(newTrack);
-  localStorage.setItem("ypt_custom_tracks", JSON.stringify(appState.customTracks));
-  
-  // Re-render
-  renderMusicLibrary();
-}
-
-// Add Local MP3 Files to Library/Queue
-function addLocalFileTracks(fileList) {
-  let firstNewIndex = appState.musicQueue.length;
-
-  for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i];
-    const objectUrl = URL.createObjectURL(file);
-    
-    // Clean filename (strip extension)
-    let title = file.name;
-    const dotIdx = title.lastIndexOf(".");
-    if (dotIdx !== -1) title = title.substring(0, dotIdx);
-
-    const newTrack = {
-      id: `custom-local-${Date.now()}-${i}`,
-      title: title,
-      artist: "Local Audio File",
-      url: objectUrl,
-      category: "local"
-    };
-
-    // Add to active library as session-only and queue
-    appState.musicQueue.push(newTrack);
-  }
-
-  updateQueueCountBadge();
-  showToast(`Added ${fileList.length} local track(s) to queue`, "success");
-  
-  // If nothing was playing, play the first added local song immediately
-  if (appState.currentTrackIndex === null || !appState.musicPlaying) {
-    playQueueTrack(firstNewIndex);
-  } else {
-    renderMusicQueue();
-  }
-}
-
-// Delete Custom Track from Library
-function deleteCustomTrack(trackId) {
-  appState.customTracks = appState.customTracks.filter(t => t.id !== trackId);
-  localStorage.setItem("ypt_custom_tracks", JSON.stringify(appState.customTracks));
-  
-  // If it was in queue, remove it from queue too
-  appState.musicQueue = appState.musicQueue.filter(t => t.id !== trackId);
-  updateQueueCountBadge();
-
-  renderMusicLibrary();
-  renderMusicQueue();
-}
-
-// Add track to queue
 function addTrackToQueue(track, playImmediately = false) {
   appState.musicQueue.push(track);
   updateQueueCountBadge();
@@ -3879,21 +3756,16 @@ function addTrackToQueue(track, playImmediately = false) {
   }
 }
 
-// Play track immediately from Library
 function playLibraryTrackImmediately(track) {
-  // Check if track is already in queue
   let idx = appState.musicQueue.findIndex(t => t.id === track.id);
   if (idx === -1) {
-    // Add to queue
     appState.musicQueue.push(track);
     idx = appState.musicQueue.length - 1;
     updateQueueCountBadge();
   }
-  
   playQueueTrack(idx);
 }
 
-// Play specific track in the queue by index
 function playQueueTrack(queueIndex) {
   if (queueIndex < 0 || queueIndex >= appState.musicQueue.length) return;
 
@@ -3901,12 +3773,11 @@ function playQueueTrack(queueIndex) {
   const track = appState.musicQueue[queueIndex];
   
   const globalPlayer = document.getElementById("music-global-player");
+  if (!globalPlayer) return;
+
+  setElementText("music-track-title", track.title);
+  setElementText("music-track-artist", track.artist);
   
-  // Update player metadata UI
-  document.getElementById("music-track-title").innerText = track.title;
-  document.getElementById("music-track-artist").innerText = track.artist;
-  
-  // Update vinyl artwork cover
   const vinylDisk = document.getElementById("music-vinyl-disk");
   if (vinylDisk) {
     if (track.image) {
@@ -3915,58 +3786,21 @@ function playQueueTrack(queueIndex) {
       vinylDisk.style.backgroundPosition = "center";
     } else {
       vinylDisk.style.backgroundImage = "";
-      vinylDisk.style.backgroundSize = "";
-      vinylDisk.style.backgroundPosition = "";
     }
   }
 
-  if (track.category === "youtube") {
-    // Pause HTML5 player
-    if (globalPlayer) {
-      globalPlayer.pause();
-    }
-    
-    // Play YouTube video
-    if (ytPlayerReady && ytPlayer && ytPlayer.loadVideoById) {
-      ytPlayer.loadVideoById(track.videoId);
-      ytPlayer.playVideo();
-      appState.musicPlaying = true;
-      updateMusicControlIcons();
-      startYouTubeTimeUpdater();
-    } else {
-      showToast("YouTube player is loading, please wait...", "warning");
-    }
-  } else {
-    // Pause YouTube player
-    if (ytPlayerReady && ytPlayer && ytPlayer.getPlayerState) {
-      try {
-        const state = ytPlayer.getPlayerState();
-        if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) {
-          ytPlayer.pauseVideo();
-        }
-      } catch (e) {
-        console.warn("YouTube player state check failed:", e);
-      }
-    }
+  globalPlayer.src = track.url;
+  globalPlayer.load();
+  
+  globalPlayer.play().then(() => {
+    appState.musicPlaying = true;
+    updateMusicControlIcons();
+  }).catch(err => {
+    console.log("Audio playback started:", err);
+    appState.musicPlaying = true;
+    updateMusicControlIcons();
+  });
 
-    if (globalPlayer) {
-      globalPlayer.src = track.url;
-      globalPlayer.load();
-      
-      // Start Playing
-      globalPlayer.play().then(() => {
-        appState.musicPlaying = true;
-        updateMusicControlIcons();
-      }).catch(err => {
-        console.log("Audio autoplay block or URL load failure:", err);
-        showToast("Autoplay blocked. Press Play to start.", "warning");
-        appState.musicPlaying = false;
-        updateMusicControlIcons();
-      });
-    }
-  }
-
-  // Update tabs render
   renderMusicQueue();
   renderMusicLibrary();
 }
@@ -3976,7 +3810,12 @@ function toggleMusicPlayback() {
   if (!globalPlayer) return;
 
   if (appState.musicQueue.length === 0) {
-    showToast("Queue is empty. Search and play a song from the Library first.", "warning");
+    const library = getFullTrackLibrary();
+    if (library.length > 0) {
+      playLibraryTrackImmediately(library[0]);
+      return;
+    }
+    showToast("Library is empty. Upload MP3 songs first.", "warning");
     return;
   }
 
@@ -3986,36 +3825,20 @@ function toggleMusicPlayback() {
 
   const track = appState.musicQueue[appState.currentTrackIndex];
 
-  if (track.category === "youtube") {
-    if (ytPlayerReady && ytPlayer) {
-      if (appState.musicPlaying) {
-        ytPlayer.pauseVideo();
-        appState.musicPlaying = false;
-      } else {
-        ytPlayer.playVideo();
-        appState.musicPlaying = true;
-        startYouTubeTimeUpdater();
-      }
-      updateMusicControlIcons();
-    } else {
-      showToast("YouTube player is loading, please wait...", "warning");
-    }
+  if (appState.musicPlaying) {
+    globalPlayer.pause();
+    appState.musicPlaying = false;
   } else {
-    if (appState.musicPlaying) {
-      globalPlayer.pause();
-      appState.musicPlaying = false;
-    } else {
-      if (globalPlayer.src !== track.url) {
-        globalPlayer.src = track.url;
-      }
-      globalPlayer.play().then(() => {
-        appState.musicPlaying = true;
-      }).catch(err => {
-        console.log("Error resuming music play:", err);
-      });
+    if (globalPlayer.src !== track.url && track.url) {
+      globalPlayer.src = track.url;
     }
-    updateMusicControlIcons();
+    globalPlayer.play().then(() => {
+      appState.musicPlaying = true;
+    }).catch(err => {
+      console.log("Error playing audio:", err);
+    });
   }
+  updateMusicControlIcons();
 }
 
 function updateMusicControlIcons() {
@@ -4049,7 +3872,6 @@ function playNextTrack() {
     if (appState.musicLoop === "all") {
       nextIdx = 0;
     } else {
-      // Loop is none or one, stop at end
       showToast("Reached the end of the queue.", "info");
       const globalPlayer = document.getElementById("music-global-player");
       if (globalPlayer) {
@@ -4068,7 +3890,6 @@ function playNextTrack() {
 function playPreviousTrack() {
   const globalPlayer = document.getElementById("music-global-player");
   if (globalPlayer && globalPlayer.currentTime > 3) {
-    // If song is past 3 seconds, restart it
     globalPlayer.currentTime = 0;
     return;
   }
@@ -4080,7 +3901,7 @@ function playPreviousTrack() {
     if (appState.musicLoop === "all") {
       prevIdx = appState.musicQueue.length - 1;
     } else {
-      prevIdx = 0; // stay on first
+      prevIdx = 0;
     }
   }
 
@@ -4089,10 +3910,8 @@ function playPreviousTrack() {
 
 function handleTrackEnded() {
   if (appState.musicLoop === "one") {
-    // Replay current
     playQueueTrack(appState.currentTrackIndex);
   } else {
-    // Skip to next
     playNextTrack();
   }
 }
@@ -4104,33 +3923,27 @@ function removeTrackFromQueue(index) {
   updateQueueCountBadge();
 
   if (appState.musicQueue.length === 0) {
-    // Queue is empty now
     appState.currentTrackIndex = null;
     appState.musicPlaying = false;
     const globalPlayer = document.getElementById("music-global-player");
     if (globalPlayer) {
       globalPlayer.src = "";
     }
-    document.getElementById("music-track-title").innerText = "Not Playing";
-    document.getElementById("music-track-artist").innerText = "Select a song from Library";
+    setElementText("music-track-title", "Not Playing");
+    setElementText("music-track-artist", "Select a song from Library");
     
-    // Reset vinyl background
     const vinylDisk = document.getElementById("music-vinyl-disk");
     if (vinylDisk) {
       vinylDisk.style.backgroundImage = "";
-      vinylDisk.style.backgroundSize = "";
-      vinylDisk.style.backgroundPosition = "";
     }
 
     updateMusicControlIcons();
   } else {
     if (wasPlayingCurrent) {
-      // Play whatever has slid into the current index
       let nextIdx = index;
       if (nextIdx >= appState.musicQueue.length) nextIdx = 0;
       playQueueTrack(nextIdx);
     } else {
-      // Adjust active track index if index before current was deleted
       if (index < appState.currentTrackIndex) {
         appState.currentTrackIndex--;
       }
@@ -4150,15 +3963,12 @@ function clearMusicQueue() {
   if (globalPlayer) {
     globalPlayer.src = "";
   }
-  document.getElementById("music-track-title").innerText = "Not Playing";
-  document.getElementById("music-track-artist").innerText = "Select a song from Library";
+  setElementText("music-track-title", "Not Playing");
+  setElementText("music-track-artist", "Select a song from Library");
   
-  // Reset vinyl background
   const vinylDisk = document.getElementById("music-vinyl-disk");
   if (vinylDisk) {
     vinylDisk.style.backgroundImage = "";
-    vinylDisk.style.backgroundSize = "";
-    vinylDisk.style.backgroundPosition = "";
   }
   
   updateMusicControlIcons();
