@@ -1235,7 +1235,7 @@ function renderTimeline() {
 
     for (let i = 0; i < numBlocks; i++) {
       const idx = startBlock + i;
-      if (idx < 144) {
+      if (idx >= 0 && idx < 144) {
         blocksData[idx] = { color, name };
       }
     }
@@ -1765,6 +1765,73 @@ function initSettings() {
     });
   }
 
+  // Backup Import & Data Restoration
+  const importBtn = document.getElementById("btn-import-data");
+  const importInput = document.getElementById("input-import-file");
+  if (importBtn && importInput) {
+    importBtn.addEventListener("click", () => {
+      importInput.click();
+    });
+
+    importInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+
+          if (!data || typeof data !== "object" || (!data.user && !data.subjects && !data.logs)) {
+            showToast("Invalid backup file structure. Please select a valid Shinova JSON export.", "danger");
+            importInput.value = "";
+            return;
+          }
+
+          const confirmMsg = `Restore workspace data from "${file.name}"? This will update your profile, study logs, subjects, and tasks.`;
+          if (await showConfirm(confirmMsg)) {
+            localStorage.setItem("ypt_initialized", "true");
+
+            if (data.user) {
+              appState.user = { ...appState.user, ...data.user };
+              localStorage.setItem("ypt_user", JSON.stringify(appState.user));
+            }
+            if (Array.isArray(data.subjects)) {
+              appState.subjects = data.subjects;
+              localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
+            }
+            if (Array.isArray(data.logs)) {
+              appState.logs = data.logs;
+              localStorage.setItem("ypt_logs", JSON.stringify(appState.logs));
+            }
+            if (Array.isArray(data.todos)) {
+              appState.todos = data.todos;
+              localStorage.setItem("ypt_todos", JSON.stringify(appState.todos));
+            }
+            if (Array.isArray(data.breaks)) {
+              appState.breaks = data.breaks;
+              localStorage.setItem("ypt_breaks", JSON.stringify(appState.breaks));
+            }
+            if (data.longestSession) {
+              appState.longestSession = data.longestSession;
+              localStorage.setItem("ypt_longest_session", JSON.stringify(appState.longestSession));
+            }
+
+            showToast("Backup data restored successfully! Reloading environment...", "success");
+            setTimeout(() => {
+              window.location.reload();
+            }, 1200);
+          }
+        } catch (err) {
+          console.error("Backup import error:", err);
+          showToast("Failed to parse backup JSON file.", "danger");
+        }
+        importInput.value = "";
+      };
+      reader.readAsText(file);
+    });
+  }
+
   // Application Wipe
   const resetBtn = document.getElementById("btn-reset-data");
   if (resetBtn) {
@@ -1895,9 +1962,16 @@ function initFocusMode() {
   if (btnModeToggle) {
     btnModeToggle.addEventListener("click", async () => {
       if (currentMode === "stopwatch") {
-        const userMins = await showPrompt("Enter countdown minutes:", "25");
+        const userMins = await showPrompt("Enter countdown minutes (1 - 360):", "25");
         if (userMins === null) return; // Cancelled
         
+        let mins = parseInt(userMins, 10);
+        if (isNaN(mins) || mins <= 0) {
+          showToast("Please enter a valid positive number of minutes.", "warning");
+          return;
+        }
+        if (mins > 360) mins = 360;
+
         endAndSaveCurrentSession();
         
         currentMode = "timer";
@@ -1905,7 +1979,6 @@ function initFocusMode() {
         document.getElementById("focus-mode-icon-timer").classList.remove("hidden");
         setElementText("focus-mode-name", "Countdown");
         
-        const mins = parseInt(userMins) || 25;
         countdownDuration = mins * 60;
         countdownRemaining = countdownDuration;
         
@@ -3317,6 +3390,15 @@ async function removeCustomTrackFromDB(id) {
 }
 
 async function loadSavedCustomTracksFromDB() {
+  // Revoke existing Blob URLs before reloading to prevent memory leaks
+  if (appState.customTracks && appState.customTracks.length > 0) {
+    appState.customTracks.forEach(t => {
+      if (t.url && t.url.startsWith("blob:")) {
+        try { URL.revokeObjectURL(t.url); } catch (e) {}
+      }
+    });
+  }
+
   const db = await openMusicDB();
   if (!db) return [];
   return new Promise((resolve) => {
