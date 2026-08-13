@@ -2851,28 +2851,129 @@ function initModals() {
     });
   }
 
+function openAddSubjectModal() {
+  editingSubjectId = null;
+  const modalTitle = document.getElementById("subject-modal-title");
+  if (modalTitle) modalTitle.innerText = "Add New Subject";
+  
+  const submitBtn = document.querySelector("#subject-form button[type='submit']");
+  if (submitBtn) submitBtn.innerText = "Create Subject";
+
+  const nameInput = document.getElementById("subject-name");
+  if (nameInput) nameInput.value = "";
+  
+  // Reset color dots and custom hue slider to default
+  document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
+  const firstDot = document.querySelector("#modal-subject .color-dot");
+  if (firstDot) firstDot.classList.add("active");
+  
+  const customHueSlider = document.getElementById("custom-subject-hue");
+  if (customHueSlider) customHueSlider.value = 270;
+  const customColorPreview = document.getElementById("custom-color-preview");
+  if (customColorPreview) {
+    customColorPreview.style.backgroundColor = "hsl(270, 70%, 60%)";
+    customColorPreview.style.boxShadow = "0 0 10px hsl(270, 70%, 60%)";
+  }
+
+  const modalSub = document.getElementById("modal-subject");
+  if (modalSub) modalSub.classList.add("active");
+}
+
+function populateTodoSubjectSelect(selectedSubjectId = null) {
+  const selectEl = document.getElementById("todo-subject-select");
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+
+  if (appState.subjects.length === 0) {
+    const emptyOpt = document.createElement("option");
+    emptyOpt.value = "";
+    emptyOpt.disabled = true;
+    emptyOpt.selected = true;
+    emptyOpt.innerText = "-- No subjects added yet --";
+    selectEl.appendChild(emptyOpt);
+  } else {
+    appState.subjects.forEach(sub => {
+      const opt = document.createElement("option");
+      opt.value = sub.id;
+      opt.innerText = sub.name;
+      if (selectedSubjectId && sub.id === selectedSubjectId) {
+        opt.selected = true;
+      }
+      selectEl.appendChild(opt);
+    });
+  }
+
+  const createOpt = document.createElement("option");
+  createOpt.value = "__CREATE_NEW__";
+  createOpt.innerText = "+ Create New Subject...";
+  selectEl.appendChild(createOpt);
+
+  if (selectedSubjectId && selectEl.querySelector(`option[value="${selectedSubjectId}"]`)) {
+    selectEl.value = selectedSubjectId;
+  }
+}
+
+// ==========================================
+// Modals Manager
+// ==========================================
+function initModals() {
+  // Modal overlay click outside close
+  document.querySelectorAll(".modal-overlay").forEach(overlay => {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        if (overlay.id === "modal-onboarding") return;
+        if (overlay.id === "modal-custom-confirm") {
+          overlay.classList.remove("active");
+          if (confirmPromiseResolve) confirmPromiseResolve(false);
+          return;
+        }
+        if (overlay.id === "modal-custom-prompt") {
+          overlay.classList.remove("active");
+          if (promptPromiseResolve) promptPromiseResolve(null);
+          return;
+        }
+        overlay.classList.remove("active");
+      }
+    });
+  });
+
+  // Close subject modal buttons
+  const btnCloseSubModal = document.getElementById("btn-close-subject-modal");
+  if (btnCloseSubModal) {
+    btnCloseSubModal.addEventListener("click", () => {
+      document.getElementById("modal-subject").classList.remove("active");
+    });
+  }
+  const btnCancelSub = document.getElementById("btn-cancel-subject");
+  if (btnCancelSub) {
+    btnCancelSub.addEventListener("click", () => {
+      document.getElementById("modal-subject").classList.remove("active");
+    });
+  }
+
   // Open Add Subject Modal from Home view
   const btnHomeAddSub = document.getElementById("btn-home-add-subject");
   if (btnHomeAddSub) {
     btnHomeAddSub.addEventListener("click", () => {
-      const nameInput = document.getElementById("subject-name");
-      if (nameInput) nameInput.value = "";
-      
-      // Reset color dots and custom hue slider to default
-      document.querySelectorAll("#modal-subject .color-dot").forEach(d => d.classList.remove("active"));
-      const firstDot = document.querySelector("#modal-subject .color-dot");
-      if (firstDot) firstDot.classList.add("active");
-      
-      const customHueSlider = document.getElementById("custom-subject-hue");
-      if (customHueSlider) customHueSlider.value = 270;
-      const customColorPreview = document.getElementById("custom-color-preview");
-      if (customColorPreview) {
-        customColorPreview.style.backgroundColor = "hsl(270, 70%, 60%)";
-        customColorPreview.style.boxShadow = "0 0 10px hsl(270, 70%, 60%)";
-      }
+      openAddSubjectModal();
+    });
+  }
 
-      const modalSub = document.getElementById("modal-subject");
-      if (modalSub) modalSub.classList.add("active");
+  // Open Add Subject Modal from Todo Modal (+ New Subject button)
+  const btnTodoAddSub = document.getElementById("btn-todo-add-subject");
+  if (btnTodoAddSub) {
+    btnTodoAddSub.addEventListener("click", () => {
+      openAddSubjectModal();
+    });
+  }
+
+  // Handle "+ Create New Subject..." choice from todo subject dropdown
+  const todoSubjectSelect = document.getElementById("todo-subject-select");
+  if (todoSubjectSelect) {
+    todoSubjectSelect.addEventListener("change", (e) => {
+      if (e.target.value === "__CREATE_NEW__") {
+        openAddSubjectModal();
+      }
     });
   }
 
@@ -2937,12 +3038,18 @@ function initModals() {
               updateChartsThemes();
             }
 
+            renderHomeSubjects();
             renderSubjectDropdown();
             
             // Get active filter for todo list
             const activeFilterBtn = document.querySelector(".todo-filters .filter-btn.active");
             const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute("data-filter") : "all";
             renderTodoList(activeFilter);
+
+            const modalTodo = document.getElementById("modal-todo");
+            if (modalTodo && modalTodo.classList.contains("active")) {
+              populateTodoSubjectSelect(editingSubjectId);
+            }
             
             showToast("Subject updated successfully!", "success");
           }
@@ -2959,13 +3066,15 @@ function initModals() {
           appState.subjects.push(newSub);
           localStorage.setItem("ypt_subjects", JSON.stringify(appState.subjects));
           
-          // If in focus view, switch to the new subject immediately
-          const focusView = document.getElementById("view-focus");
-          if (focusView && focusView.classList.contains("active")) {
-            changeActiveSubject(newSub.id);
-          } else {
-            renderSubjectDropdown();
+          renderHomeSubjects();
+          renderSubjectDropdown();
+
+          // If todo task modal is open, re-populate and auto-select the new subject
+          const modalTodo = document.getElementById("modal-todo");
+          if (modalTodo && modalTodo.classList.contains("active")) {
+            populateTodoSubjectSelect(newSub.id);
           }
+
           showToast("Subject created successfully!", "success");
         }
         
@@ -2992,21 +3101,7 @@ function initModals() {
   const btnAddTodo = document.getElementById("btn-add-todo");
   if (btnAddTodo) {
     btnAddTodo.addEventListener("click", () => {
-      const selectEl = document.getElementById("todo-subject-select");
-      if (!selectEl) return;
-      selectEl.innerHTML = "";
-      
-      if (appState.subjects.length === 0) {
-        showToast("Please add at least one subject first before creating tasks.", "warning");
-        return;
-      }
-
-      appState.subjects.forEach(sub => {
-        const opt = document.createElement("option");
-        opt.value = sub.id;
-        opt.innerText = sub.name;
-        selectEl.appendChild(opt);
-      });
+      populateTodoSubjectSelect();
 
       const titleInput = document.getElementById("todo-title");
       if (titleInput) titleInput.value = "";
@@ -3026,6 +3121,11 @@ function initModals() {
       
       const title = titleInput ? titleInput.value.trim() : "";
       const subjectId = selectEl ? selectEl.value : "";
+
+      if (subjectId === "__CREATE_NEW__" || !subjectId) {
+        showToast("Please select or create a valid subject for this task.", "warning");
+        return;
+      }
 
       if (title && subjectId) {
         const newTodo = {
