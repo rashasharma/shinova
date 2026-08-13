@@ -2814,43 +2814,8 @@ function stopAllAmbientSounds() {
 }
 
 // ==========================================
-// Modals Manager
+// Subject & Modal Helpers
 // ==========================================
-function initModals() {
-  // Modal overlay click outside close
-  document.querySelectorAll(".modal-overlay").forEach(overlay => {
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) {
-        if (overlay.id === "modal-onboarding") return;
-        if (overlay.id === "modal-custom-confirm") {
-          overlay.classList.remove("active");
-          if (confirmPromiseResolve) confirmPromiseResolve(false);
-          return;
-        }
-        if (overlay.id === "modal-custom-prompt") {
-          overlay.classList.remove("active");
-          if (promptPromiseResolve) promptPromiseResolve(null);
-          return;
-        }
-        overlay.classList.remove("active");
-      }
-    });
-  });
-
-  // Close subject modal buttons
-  const btnCloseSubModal = document.getElementById("btn-close-subject-modal");
-  if (btnCloseSubModal) {
-    btnCloseSubModal.addEventListener("click", () => {
-      document.getElementById("modal-subject").classList.remove("active");
-    });
-  }
-  const btnCancelSub = document.getElementById("btn-cancel-subject");
-  if (btnCancelSub) {
-    btnCancelSub.addEventListener("click", () => {
-      document.getElementById("modal-subject").classList.remove("active");
-    });
-  }
-
 function openAddSubjectModal() {
   editingSubjectId = null;
   const modalTitle = document.getElementById("subject-modal-title");
